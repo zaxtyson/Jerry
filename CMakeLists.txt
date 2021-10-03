@@ -27,13 +27,13 @@ if (UNITTEST)
     add_subdirectory(unittests)
 endif ()
 
-if (SHOW_LOG)
+if(SHOW_LOG)
     add_definitions(-D SHOW_LOG)
 endif ()
 
-if (SHOW_LOG_DETAIL)
+if(SHOW_LOG_DETAIL)
     add_definitions(-DSHOW_LOG_DETAIL)
-endif ()
+endif()
 
 if (BUILD_EXAMPLES)
     aux_source_directory(src/utils SRC_LIST)
