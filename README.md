@@ -19,7 +19,32 @@
 └── unittests          # 单元测试
 ```
 
-项目使用 Cmake 进行编译, 使用 catch2 进行单元测试, 使用 wrk 进行压测
+## 如何编译
+
+本项目使用 Cmake 进行编译, 使用 catch2 进行单元测试, 使用 wrk 进行压测
+
+测试环境为:
+
+- 本地: OpenSUSE 15.3/GCC 7.5.0/Cmake 3.17.0/make 4.2.1
+- 远程: Centos 7.6/GCC 10.2.1/Cmake 3.21.3/make 4.2.1
+
+Centos7 自带的工具链版本较低, 如果无法编译, 请参见[升级工具链](docs/update-dev-tools.md)
+
+```
+git clone https://github.com.cnpmjs.org/zaxtyson/Jerry.git
+cd Jerry
+```
+
+在项目根目录的 `CMakeLists.txt` 配置编译参数, 如日志/是否编译example/是否编译单元测试等等
+
+```
+mkdir build
+cmake ..
+make -j
+```
+
+编译生成的二进制程序在 `build/examples` 和 `build/unittests` 下
+
 
 ## 技术点
 
