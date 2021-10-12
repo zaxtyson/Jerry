@@ -4,7 +4,7 @@
 
 #include "HttpServer.h"
 #include <http/HttpContext.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 
 HttpServer::HttpServer(EventLoop *mainLoop, const InetAddress &bindAddress, int workers) :
         TcpServer(mainLoop, bindAddress, workers) {

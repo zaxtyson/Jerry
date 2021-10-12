@@ -8,7 +8,7 @@
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <utils/Date.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 #include <cassert>
 
 /**
@@ -19,7 +19,6 @@ static int createEventFd() {
     int evtFd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (evtFd < 0) {
         LOG_FATAL("Cannot create event fd!");
-        exit(1);
     }
     return evtFd;
 }
@@ -32,7 +31,6 @@ static int createTimerFd() {
     int timerFd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
     if (timerFd < 0) {
         LOG_FATAL("Cannot create event fd!");
-        exit(1);
     }
     return timerFd;
 }

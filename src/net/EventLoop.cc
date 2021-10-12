@@ -82,7 +82,6 @@ void EventLoop::assertInLoopThread() {
     auto tid = std::this_thread::get_id();
     if (threadId_ != tid) {
         LOG_FATAL("Assertion failed, caller not in EventLoop thread");
-        abort();
     }
 }
 

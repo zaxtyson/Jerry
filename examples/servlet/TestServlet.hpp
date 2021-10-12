@@ -3,7 +3,7 @@
 //
 
 #include <http/HttpServlet.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 
 class TestServlet : public HttpServlet {
 public:

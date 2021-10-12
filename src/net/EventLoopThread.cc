@@ -3,7 +3,7 @@
 //
 
 #include "EventLoopThread.h"
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 
 EventLoopThread::~EventLoopThread() {
     LOG_INFO("%s closing...", threadName_.c_str());

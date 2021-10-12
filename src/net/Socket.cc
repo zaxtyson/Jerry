@@ -4,7 +4,7 @@
 
 #include <unistd.h>
 #include <net/Socket.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 #include <cassert>
 #include <cerrno>
 #include <cstring>
@@ -13,7 +13,6 @@ Socket::Socket() {
     sockFd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (sockFd_ == -1) {
         LOG_FATAL("Created socket failed, %s", strerror(errno));
-        exit(-1);
     }
     LOG_INFO("Created socket success, socket fd = %d", sockFd_);
 }
@@ -29,8 +28,7 @@ void Socket::bindAddress(const InetAddress &localAddress) {
     assert(sockFd_ > 0);
     localAddress_ = localAddress;
     if (::bind(sockFd_, localAddress_.getSockAddr(), localAddress_.getSockLen()) == -1) {
-        LOG_FATAL("Bind %s failed, sockfd = %d, %s", localAddress.getIpPort().c_str(), sockFd_, strerror(errno));
-        exit(1);
+        LOG_FATAL("Bind %s failed, sockfd = %d", localAddress.getIpPort().c_str(), sockFd_);
     }
     LOG_INFO("Bind %s success, sockfd = %d", localAddress.getIpPort().c_str(), sockFd_);
 }
@@ -46,8 +44,7 @@ void Socket::listen() {
     // https://jaminzhang.github.io/linux/understand-Linux-backlog-and-somaxconn-kernel-arguments/
     // https://stackoverflow.com/questions/62641621/what-is-the-difference-between-tcp-max-syn-backlog-and-somaxconn/62643129
     if (::listen(sockFd_, SOMAXCONN) < 0) {
-        LOG_FATAL("Listen failed, sockfd = %d, %s", sockFd_, strerror(errno));
-        exit(1);
+        LOG_FATAL("Listen failed, sockfd = %d", sockFd_);
     }
 }
 

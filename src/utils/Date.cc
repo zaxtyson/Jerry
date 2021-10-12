@@ -13,14 +13,14 @@ Date Date::now() {
 }
 
 std::string Date::toString() {
-    char buf[128] = {0};
+    char buf[27] = {0};
     time_t secs = static_cast<time_t>(microSecondsSinceEpoch_ / kMicroSecondsPerSecond);
     int ms = static_cast<int>(microSecondsSinceEpoch_ % kMicroSecondsPerSecond);
     tm tm_time{};
     gmtime_r(&secs, &tm_time);
     snprintf(buf,
              sizeof(buf),
-             "%4d-%02d-%02d %02d:%02d:%02d.%06d",
+             "%4d-%02d-%02d %02d:%02d:%02d.%06d", // len = 26
              tm_time.tm_year + 1900,
              tm_time.tm_mon + 1,
              tm_time.tm_mday,
@@ -34,7 +34,6 @@ std::string Date::toString() {
 Date Date::addSeconds(double seconds) {
     return Date(microSecondsSinceEpoch_ + static_cast<int64_t>(seconds * kMicroSecondsPerSecond));
 }
-
 
 
 

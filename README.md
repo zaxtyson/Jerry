@@ -50,21 +50,21 @@ make -j
 
 - 非阻塞式IO, 使用 epoll 实现 IO 多路复用, LT 模式触发
 - 主从 Reactor 模型, 主线程负责 Accept, 通过 RoundRobin 分发给 Reactor 线程池处理
-- 支持长连接、优雅关闭, 发送完缓冲区才 shutdown
-- 使用向量 IO 实现高性能缓冲区
+- 支持长连接、优雅关闭, 用户缓冲区发送完成才 shutdown 断开连接
+- 使用向量 IO 实现高性能 Buffer
 - 使用 eventfd 实现线程间的异步唤醒
-- 使用小根堆实现了定时器, 支持单次定时/重复定时(可设置条件自动停止)
+- 使用小根堆实现了定时器, 支持单次定时/重复定时/条件定时
 - 使用 timerfd 实现触发最近一次超时的定时器
 - 使用状态机解析 HTTP 请求
+- 高性能异步日志, 多缓冲双队列设计
 - 封装 Servlet 接口, 方便编写 Web 程序
 
 ## 测试
 
-see docs
+见 `unittests` 目录, 文档位于 `docs`
 
 ## TODO
 
-- [ ] 高性能日志
 - [ ] MySQL 连接池
 - [ ] HTTP Sessions
 - [ ] Servlet Filter
@@ -88,3 +88,5 @@ muduo 框架中大量使用 bind 回调，从设计模式上来上，"组合优�
 我为了观察 Epoll 触发事件类型的函数 getEventTypeName 居然吃掉了 12% 的性能！只是因为每次
 Epoll 触发它都要构造一个 stringstream 对象，后面换成普通的 string 之后, 性能开销直接降到了 1.3% 左右! 
 然而我的 Log 还是要吃掉 1/3 的时间，关掉日志后用 wrk 测压，服务器吞吐量翻了近 7 倍！
+
+日志库的设计折腾了很久, 见 [docs/logger](./docs/logger.md)

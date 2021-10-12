@@ -3,7 +3,7 @@
 //
 
 #include <net/Poller.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
@@ -11,8 +11,7 @@
 Poller::Poller() {
     pollFd_ = epoll_create1(EPOLL_CLOEXEC);
     if (pollFd_ == -1) {
-        LOG_FATAL("Create poller failed, %s", strerror(errno));
-        exit(1);
+        LOG_FATAL("Create poller failed, %s");
     }
 }
 

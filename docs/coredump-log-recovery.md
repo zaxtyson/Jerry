@@ -105,7 +105,7 @@ Missing separate debuginfos, use: zypper install glibc-debuginfo-2.31-7.30.x86_6
 #2  0x0000000000403b3b in main ()
 ```
 
-切换到另一个线程看看:
+切换到另一个线程看看(muduo异步日志模块开了一个线程专门写日志到磁盘):
 
 ```
 (gdb) thread 2
@@ -128,7 +128,7 @@ Missing separate debuginfos, use: zypper install glibc-debuginfo-2.31-7.30.x86_6
 #7  0x00007f2547e07d0f in clone () from /lib64/libc.so.6
 ```
 
-定位到 `muduo::AsyncLogging::threadFunc`所在的 frame, 进去看看
+定位到 `muduo::AsyncLogging::threadFunc`所在的 frame, 进去看看, 这个函数是负责写日志的
 
 ```
 (gdb) frame 2
@@ -136,12 +136,14 @@ Missing separate debuginfos, use: zypper install glibc-debuginfo-2.31-7.30.x86_6
 79              cond_.waitForSeconds(flushInterval_);
 ```
 
-查看下变量
+可以看到这里有一个条件等待, 这个 `flushInterval_` 默认是 3 秒, 超时了就赶快写入数据到磁盘.
+
+查看下这个函数里面用了那些变量
 
 ```
 (gdb) info locals 
 lock = {<muduo::noncopyable> = {<No data fields>}, mutex_ = @0x6105b8}
-output = {<muduo::noncopyable> = {<No data fields>}, basename_ = "coredump", rollSize_ = 200000000, flushInterval_ = 3, checkEveryN_ = 1024, count_ = 24, 
+output = {<muduo::noncopyable> = {<No data fields>}, logPath_ = "coredump", rollSize_ = 200000000, flushInterval_ = 3, checkEveryN_ = 1024, count_ = 24, 
   mutex_ = std::unique_ptr<muduo::MutexLock> = {get() = 0x0}, startOfPeriod_ = 1633305600, lastRoll_ = 1633330127, lastFlush_ = 1633330127, 
   file_ = std::unique_ptr<muduo::FileUtil::AppendFile> = {get() = 0x7f2540000bc0}, static kRollPerSeconds_ = 86400}
 newBuffer1 = std::unique_ptr<muduo::detail::FixedBuffer<4000000>> = {get() = 0x7f2546993010}
@@ -169,7 +171,7 @@ buffersToWrite = std::vector of length 0, capacity 16
     }
 ```
 
-我们打印下看看
+我们打印下 currentBuffer_ 看看
 
 ```
 (gdb) p currentBuffer_
@@ -189,6 +191,8 @@ value of type `muduo::detail::FixedBuffer<4000000>' requires 4000016 bytes, whic
 set max-value-size unlimited
 set print elements 1000
 ```
+
+好了, 继续打印
 
 ```
 (gdb) p *currentBuffer_.get()
@@ -234,7 +238,7 @@ dump binary memory dump.log $1.data_ $1.cur_
 20211004 06:48:47.614484Z 21314 INFO  This is a test message, msg_id=499999 - log_coredump_test.cc:27
 ```
 
-OK, 已经拿到 `abort()` 发生前的所以日志~
+OK, 已经拿到 `abort()` 发生前的所有日志~
 
 
 

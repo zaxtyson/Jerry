@@ -5,7 +5,7 @@
 #include "catch2.hpp"
 #include <net/MsgBuffer.h>
 #include <http/HttpContext.h>
-#include <utils/Logger.h>
+#include <utils/log/Logger.h>
 
 SCENARIO("Test HttpContext") {
     GIVEN("HttpContext and Buffer") {
