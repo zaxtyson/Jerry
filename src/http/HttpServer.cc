@@ -31,19 +31,21 @@ void HttpServer::onReceiveMessage(const spTcpConnection &conn, MsgBuffer &buffer
 
     // 完整解析
     HttpRequest &request = ctx->getRequest();
-    LOG_DEBUG("%s %s", request.getMethodStr().c_str(), request.getRequestURI().c_str());
 
     // 根据路径找到 servlet 处理
     auto path = request.getServletPath();
-    if (servlets_.find(path) == servlets_.end()) {
+    // TODO: 实现更灵活的路由匹配规则
+    if (routes_.find(path) == routes_.end()) {
         response.setStatus(HttpResponse::StatusCode::kNotFound);
         response.getWriter()->print("<h1>404, Not Found</h1>");
     } else {
-        HttpServletPtr servlet = servlets_[path];
+        HttpServletPtr servlet = routes_[path];
         servlet->service(request, response);
     }
 
-//    LOG_DEBUG("%s", response.toString().c_str());
+    // 用户请求日志
+    LOG_INFO("%s - \"%s\" %d %ld", conn->getPeerAddress().getIp().c_str(),
+             request.getRawRequestLine().c_str(), response.getStatus(), response.getContentLength());
     conn->send(response.toString());
     ctx->reset();
 }
@@ -60,13 +62,17 @@ void HttpServer::onConnectionClose(const spTcpConnection &conn) {
 
 }
 
-void HttpServer::registerRoute(const std::string &path, HttpServlet *servlet) {
-    servlets_[path] = std::shared_ptr<HttpServlet>(servlet);
+void HttpServer::registerRoute(const std::string &urlPattern, HttpServlet *servlet) {
+    routes_[urlPattern] = std::shared_ptr<HttpServlet>(servlet);
     servlet->init();
 }
 
 void HttpServer::onServerClose() {
-    for (auto &servlet: servlets_) {
+    for (auto &servlet: routes_) {
         servlet.second->destroy();
     }
 }
+
+//const HttpServer::HttpServletPtr &HttpServer::findRoute(const std::string &path) const {
+//    return ;
+//}

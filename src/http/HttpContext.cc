@@ -3,7 +3,7 @@
 //
 
 
-//    GET /index.html HTTP/1.1
+//    GET /index.html.back HTTP/1.1
 //    Accept: */*
 //    Accept-Encoding: gzip, deflate
 //    Connection: keep-alive
@@ -50,6 +50,7 @@ bool HttpContext::parseRequestLine(const char *begin, const char *end) {
     auto version = std::string(end - 1, end);
     if (version != "0" && version != "1") return false;  // 有问题
     request_.setVersion(version);
+    request_.setRawRequestLine(std::string(begin, end));
     return true;
 }
 

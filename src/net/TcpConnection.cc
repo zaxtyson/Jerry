@@ -46,7 +46,7 @@ void TcpConnection::handleRead(Date date) {
     if (n == 0) {
         // 客户端关闭连接, 不知道是那一种情况, 保险起见我们看成半关闭,
         // 应用层不能在 send, 但是 BufferOut 的数据我们还是尽量发出去
-        LOG_INFO("Read 0 bytes, peer maybe close() or shutdown(WR)");
+        LOG_DEBUG("Read 0 bytes, peer maybe close() or shutdown(WR)");
         isPeerShutdown_ = true;
         bindChannel_.disableReading(); // 对方已经不再写了, 我们不再关注可读事件
         loop_->updateChannel(&bindChannel_);
@@ -92,7 +92,7 @@ void TcpConnection::handleWrite() {
 
 void TcpConnection::handleClose() {
     // EPOLLHUP, 对方发送 RST
-    LOG_INFO("Peer has closed, address: %s", peerAddress_.getIpPort().c_str());
+    LOG_DEBUG("Peer has closed, address: %s", peerAddress_.getIpPort().c_str());
     isConnected_ = false; // 连接已经断掉了
     bindChannel_.disableAllEvent();
     loop_->updateChannel(&bindChannel_);

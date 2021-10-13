@@ -31,6 +31,6 @@ public:
     }
 
     void doPost(const HttpRequest &req, HttpResponse &resp) override {
-        LOG_INFO("%s", req.getBody().c_str());
+        doGet(req, resp);
     }
 };

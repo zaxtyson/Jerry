@@ -6,7 +6,7 @@
 #define JERRY_HTTPREQUEST_H
 
 #include <utils/NonCopyable.h>
-#include <map>
+#include <unordered_map>
 #include <string>
 
 class HttpContext;
@@ -16,7 +16,7 @@ class HttpContext;
  */
 class HttpRequest : NonCopyable {
 public:
-    using Headers = std::map<std::string, std::string>;
+    using Headers = std::unordered_map<std::string, std::string>;
 public:
     friend class HttpContext;
 
@@ -42,12 +42,6 @@ public:
     Method getMethod() const { return method_; }
 
     /**
-     * 获取请求方法对应的字符串
-     * @return
-     */
-    const std::string getMethodStr() const { return methodStr_; }
-
-    /**
      * 获取客户端使用的 HTTP 版本
      * @return
      */
@@ -55,9 +49,9 @@ public:
 
     /**
      * 获取请求路径
-     * @return 如: /foo/bar/index.html
+     * @return 如: /foo/bar/index.html.back
      */
-    std::string getRequestURI() const { return path_; }
+    const std::string& getRequestURI() const { return path_; }
 
     /**
      * 获取 URI 不包含文件名的部分
@@ -89,17 +83,25 @@ public:
      * 获取全部的 Headers
      * @return
      */
-    Headers getHeaders() const { return headers_; }
+    const Headers& getHeaders() const { return headers_; }
 
     /**
      * 获取请求体
      * @return
      */
-    const std::string getBody() const { return body_; }
+    const std::string& getBody() const { return body_; }
+
+    /**
+     * 获取原始请求行
+     * @return
+     */
+    const std::string& getRawRequestLine() const { return rawRequestLine_; }
 
 private:
 
     void clear();
+
+    void setRawRequestLine(const std::string &line){ rawRequestLine_ = line; };
 
     void setBody(std::string &&body) { body_ = body; }
 
@@ -117,8 +119,8 @@ private:
 private:
     Version version_{Version::kHttpUnknown};
     Method method_{Method::kInvalid};
-    std::string methodStr_;  // for logger debug
-    std::string path_;  //  /foo/bar/index.html
+    std::string rawRequestLine_;
+    std::string path_;  //  /foo/bar/index.html.back
     std::string queryString_; // foo=bar&key=value
     Headers headers_{};
     std::string body_;

@@ -12,13 +12,13 @@
 #include <utils/NonCopyable.h>
 #include <http/PrintWriter.h>
 #include <string>
-#include <map>
+#include <unordered_map>
 
 class HttpServer;
 
 class HttpResponse : NonCopyable {
 public:
-    using Headers = std::map<std::string, std::string>;
+    using Headers = std::unordered_map<std::string, std::string>;
 public:
     friend class HttpServer;
 
@@ -48,6 +48,12 @@ public:
     void setStatus(StatusCode status) { statusCode_ = status; };
 
     /**
+     * 获取响应码对应的数字
+     * @return
+     */
+    int getStatus() const { return static_cast<int>(statusCode_); };
+
+    /**
      * 添加一项 Header
      * @param key
      * @param value
@@ -59,6 +65,12 @@ public:
      * @param contentType
      */
     void setContentType(const std::string &contentType) { addHeader("Content-Type", contentType); }
+
+    /**
+     * 获取响应内容的字节数
+     * @return
+     */
+    size_t getContentLength() const { return writer_.getData().size(); }
 
     /**
      * 用于向客户端写数据
@@ -86,7 +98,7 @@ private:
     StatusCode statusCode_{StatusCode::kOk};
     Headers headers_;
     PrintWriter writer_;
-    static std::map<StatusCode, std::string> httpStatusCodeMap_;
+    static std::unordered_map<StatusCode, std::string> httpStatusCodeMap_;
 };
 
 

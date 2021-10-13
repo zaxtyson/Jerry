@@ -20,7 +20,7 @@ public:
 
     ~HttpServer() override = default;
 
-    void registerRoute(const std::string &path, HttpServlet *servlet);
+    void registerRoute(const std::string &urlPattern, HttpServlet *servlet);
 
 private:
 
@@ -37,8 +37,10 @@ private:
 public:
     void onServerClose() override;
 
+//    const HttpServletPtr& findRoute(const std::string &path) const;
+
 private:
-    std::map<std::string, HttpServletPtr> servlets_{};
+    std::unordered_map<std::string, HttpServletPtr> routes_{};
 };
 
 

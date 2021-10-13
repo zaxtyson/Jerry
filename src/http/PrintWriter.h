@@ -18,7 +18,7 @@ public:
     ~PrintWriter() = default;
 
     template<typename T>
-    void print(T data) {
+    void print(const T& data) {
         data_.append(data);
     }
 

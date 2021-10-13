@@ -4,7 +4,7 @@
 
 #include "HttpResponse.h"
 
-std::map<HttpResponse::StatusCode, std::string> HttpResponse::httpStatusCodeMap_ = {
+std::unordered_map<HttpResponse::StatusCode, std::string> HttpResponse::httpStatusCodeMap_ = {
         {HttpResponse::StatusCode::kOk,                  "OK"},
         {HttpResponse::StatusCode::kNotFound,            "Not Found"},
         {HttpResponse::StatusCode::kFound,               "Found"},

@@ -39,6 +39,7 @@ SCENARIO("Test HttpContext") {
             REQUIRE(context.parseRequest(buffer));
             REQUIRE(context.isParseFinished());
             HttpRequest &req = context.getRequest();
+            REQUIRE(req.getServletPath() == "/");
             REQUIRE(req.getQueryString() == "");
         }
 
@@ -49,6 +50,7 @@ SCENARIO("Test HttpContext") {
             REQUIRE(context.parseRequest(buffer));
             REQUIRE(context.isParseFinished());
             HttpRequest &req = context.getRequest();
+            REQUIRE(req.getServletPath() == "/");
             REQUIRE(req.getQueryString() == "foo=bar");
             REQUIRE(req.getParameter("foo") == "bar");
         }
@@ -60,6 +62,7 @@ SCENARIO("Test HttpContext") {
             REQUIRE(context.parseRequest(buffer));
             REQUIRE(context.isParseFinished());
             HttpRequest &req = context.getRequest();
+            REQUIRE(req.getServletPath() == "/foo/bar");
             REQUIRE(req.getQueryString() == "foo=bar&blank1=&key=value&blank2=");
             REQUIRE(req.getParameter("foo") == "bar");
             REQUIRE(req.getParameter("key") == "value");

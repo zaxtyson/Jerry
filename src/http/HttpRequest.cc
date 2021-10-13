@@ -13,7 +13,6 @@ std::string HttpRequest::getHeader(const std::string &key) {
 }
 
 void HttpRequest::setMethod(const std::string &method) {
-    methodStr_ = method;
     if (method == "GET") {
         method_ = Method::kGet;
     } else if (method == "POST") {
@@ -48,12 +47,13 @@ void HttpRequest::clear() {
 }
 
 std::string HttpRequest::getServletPath() const {
-    // /foo/bar/index.html -> /foo/bar
+    // /foo/bar/index.html.back -> /foo/bar
     // /foo/bar -> /foo
     // foo/bar/ -> /foo/bar
+    // /foo -> /
     // / -> /
     auto pos = path_.find_last_of('/');
-    if (pos == 0) return path_;
+    if (pos == 0) return "/";
     return path_.substr(0, pos);
 }
 
