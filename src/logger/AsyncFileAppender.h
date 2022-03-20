@@ -2,8 +2,8 @@
 // Created by zaxtyson on 2021/10/8.
 //
 
-#ifndef JERRY_ASYNCLOGGER_H
-#define JERRY_ASYNCLOGGER_H
+#ifndef JERRY_ASYNCFILEAPPENDER_H
+#define JERRY_ASYNCFILEAPPENDER_H
 
 #include <atomic>
 #include <condition_variable>
@@ -27,13 +27,13 @@ class FixedBuffer : NonCopyable {
     ~FixedBuffer() = default;
 
     void Append(const char* msg, size_t len);
-    size_t AvailableBytes() const { return End() - cur; }
-    size_t ReadableBytes() const { return cur - data; }
-    char* Begin() { return data; }
-    void Reset() { cur = data; }
-
-  private:
-    const char* End() const { return data + sizeof(data); }
+    size_t AvailableBytes() const;
+    size_t ReadableBytes() const;
+    void Reset();
+    const char* Begin();
+    const char* End();
+    const char* Begin() const;
+    const char* End() const;
 
   private:
     char data[kFixedBufferSize]{};
@@ -41,13 +41,14 @@ class FixedBuffer : NonCopyable {
 };
 
 
-class AsyncLogger : Appender {
+class AsyncFileAppender : public Appender {
   public:
-    explicit AsyncLogger(std::string_view path, int auto_flush_interval = 3);
-    ~AsyncLogger() override;
+    explicit AsyncFileAppender(std::string_view path, int auto_flush_interval = 3);
+    ~AsyncFileAppender() override = default;
 
     void Start();
-    void Stop() override;
+    void Stop();
+    void Flush() override;
     void Append(const char* msg, size_t len) override;
 
   private:

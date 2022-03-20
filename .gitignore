@@ -1,3 +1,7 @@
 # Project exclude paths
-/cmake-build-debug/
-/cmake-build-debug-coverage/
+cmake-build-debug
+cmake-build-release
+cmake-build-debug-coverage
+.idea
+.vscode
+dist

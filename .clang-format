@@ -1,0 +1,15 @@
+BasedOnStyle: Chromium
+IndentWidth: 4
+UseTab: Never
+TabWidth: 4
+UseCRLF: false
+
+---
+Language: Cpp
+NamespaceIndentation: None
+BinPackArguments: false
+AllowShortIfStatementsOnASingleLine: WithoutElse
+ColumnLimit: 100
+MaxEmptyLinesToKeep: 2
+FixNamespaceComments: true
+AccessModifierOffset: -2

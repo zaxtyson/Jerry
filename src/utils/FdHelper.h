@@ -5,7 +5,7 @@
 #ifndef JERRY_FDHELPER_H
 #define JERRY_FDHELPER_H
 
-#include <stdint.h>
+#include <cstdint>
 
 namespace jerry::utils {
 
@@ -14,6 +14,8 @@ namespace jerry::utils {
  * @param fd the fd to close
  */
 void Close(int fd);
+
+int CreateEpollFd();
 
 int CreateEventFd();
 

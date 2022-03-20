@@ -3,12 +3,14 @@
 //
 
 #include "FdHelper.h"
+#include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <unistd.h>  // close
-#include <utils/DateTime.h>
+#include "utils/DateTime.h"
 
 namespace jerry::utils {
+
 void Close(int fd) {
     if (fd < 0) {
         return;
@@ -19,10 +21,13 @@ void Close(int fd) {
     errno = errno_bak;
 }
 
+int CreateEpollFd() {
+    return epoll_create1(EPOLL_CLOEXEC);
+}
+
 int CreateEventFd() {
     return eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
 }
-
 
 int CreateTimerFd() {
     return timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -30,7 +35,6 @@ int CreateTimerFd() {
 
 void SetTimerFd(int fd, int64_t expired_us) {
     // https://man7.org/linux/man-pages/man2/timerfd_create.2.html
-    // https://www.jianshu.com/p/66b3c75cae81
     struct itimerspec its {};
     expired_us = (expired_us > 100) ? expired_us : 100;
     its.it_value.tv_sec =

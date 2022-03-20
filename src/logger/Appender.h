@@ -2,32 +2,28 @@
 // Created by zaxtyson on 2021/10/11.
 //
 
-#ifndef JERRY_LOGGEROUTPUT_H
-#define JERRY_LOGGEROUTPUT_H
+#ifndef JERRY_APPENDER_H
+#define JERRY_APPENDER_H
 
-#include <cstddef>
+#include <iostream>
 #include "utils/NonCopyable.h"
 
 namespace jerry::logger {
 
-class LoggerOutput : NonCopyable {
+class Appender : NonCopyable {
   public:
-    LoggerOutput() = default;
-    virtual ~LoggerOutput() = default;
+    Appender() = default;
+    virtual ~Appender() = default;
 
     virtual void Append(const char* msg, size_t len) = 0;
-    virtual void Stop() = 0;
+    virtual void Flush(){};
 };
 
-class ConsoleLoggerOutput : LoggerOutput {
+class StderrAppender : public Appender {
   public:
-    ConsoleLoggerOutput() = default;
-    ~ConsoleLoggerOutput() override = default;
-
-    void Append(const char* msg, size_t len) override { printf("%s", msg); }
-    void Stop() override {}
+    void Append(const char* msg, [[maybe_unused]] size_t len) override { std::cerr << msg; }
 };
 
 }  // namespace jerry::logger
 
-#endif  // JERRY_LOGGEROUTPUT_H
+#endif  // JERRY_APPENDER_H

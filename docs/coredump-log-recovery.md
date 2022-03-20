@@ -1,6 +1,6 @@
 # Coredump Log 找回
 
-如果一部分日志还没写入磁盘, 程序挂掉了, 这时可以通过 coredump 文件从缓存日志的 Buffer
+如果一部分日志还没写入磁盘, 程序挂掉了, 这时可以通过 coredump 文件从缓存日志的 FixedBuffer
 中把剩余的日志 dump 出来.
 
 启用 coredump, 设置 coredump 文件的名字为 "core"
@@ -28,13 +28,13 @@ AsyncLogging logger("coredump", 100 * 1000 * 1000);  // 分块 100MB
 
 static void asyncOutput(const char *msg, int len)
 {
-    logger.append(msg, len);
+    logger.Append(msg, len);
 }
 
 int main(int argc, char const *argv[])
 {
-    logger.start();                 // 开启日志线程
-    Logger::setOutput(asyncOutput); //设置日志输出函数
+    logger.Start();                 // 开启日志线程
+    Logger::SetAppender(asyncOutput); //设置日志输出函数
 
     for (int i = 0; i < 1000000; i++)
     {
@@ -66,7 +66,7 @@ log_coredump_test  log_coredump_test.cc
 ➜  muduo_log ll
 总用量 63M
 -rw------- 1 zaxtyson users  24M 10月  4 14:48 core
--rw-r--r-- 1 zaxtyson users  46M 10月  4 14:48 coredump.20211004-064847.f117.21314.log
+-rw-r--r-- 1 zaxtyson users  46M 10月  4 14:48 coredump.20211004-064847.f117.21314.Log
 -rwxr-xr-x 1 zaxtyson users 1.4M 10月  4 14:47 log_coredump_test
 -rw-r--r-- 1 zaxtyson users  690 10月  4 14:48 log_coredump_test.cc
 ```
@@ -74,7 +74,7 @@ log_coredump_test  log_coredump_test.cc
 先看看写了多少条日志到磁盘, 打印日志倒数 3 条
 
 ```
-➜  muduo_log tail -n3 coredump.20211004-064847.f117.21314.log 
+➜  muduo_log tail -n3 coredump.20211004-064847.f117.21314.Log 
 20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473231 - log_coredump_test.cc:27
 20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473232 - log_coredump_test.cc:27
 20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473233 - log_coredump_test.cc:27
@@ -133,7 +133,7 @@ Missing separate debuginfos, use: zypper install glibc-debuginfo-2.31-7.30.x86_6
 ```
 (gdb) frame 2
 #2  0x0000000000405187 in muduo::AsyncLogging::threadFunc (this=0x610440 <logger>) at /home/zaxtyson/Downloads/muduo-cpp17/muduo/base/AsyncLogging.cc:79
-79              cond_.waitForSeconds(flushInterval_);
+79              cond.waitForSeconds(flushInterval_);
 ```
 
 可以看到这里有一个条件等待, 这个 `flushInterval_` 默认是 3 秒, 超时了就赶快写入数据到磁盘.
@@ -143,30 +143,30 @@ Missing separate debuginfos, use: zypper install glibc-debuginfo-2.31-7.30.x86_6
 ```
 (gdb) info locals 
 lock = {<muduo::noncopyable> = {<No data fields>}, mutex_ = @0x6105b8}
-output = {<muduo::noncopyable> = {<No data fields>}, logPath_ = "coredump", rollSize_ = 200000000, flushInterval_ = 3, checkEveryN_ = 1024, count_ = 24, 
+appender = {<muduo::noncopyable> = {<No data fields>}, logPath_ = "coredump", rollSize_ = 200000000, flushInterval_ = 3, checkEveryN_ = 1024, count = 24, 
   mutex_ = std::unique_ptr<muduo::MutexLock> = {get() = 0x0}, startOfPeriod_ = 1633305600, lastRoll_ = 1633330127, lastFlush_ = 1633330127, 
-  file_ = std::unique_ptr<muduo::FileUtil::AppendFile> = {get() = 0x7f2540000bc0}, static kRollPerSeconds_ = 86400}
+  log_file = std::unique_ptr<muduo::FileUtil::AppendFile> = {get() = 0x7f2540000bc0}, static kRollPerSeconds_ = 86400}
 newBuffer1 = std::unique_ptr<muduo::detail::FixedBuffer<4000000>> = {get() = 0x7f2546993010}
 newBuffer2 = std::unique_ptr<muduo::detail::FixedBuffer<4000000>> = {get() = 0x7f25465c2010}
 buffersToWrite = std::vector of length 0, capacity 16
 ```
 
-可以看到有双缓冲, 两个 Buffer, 那么正在写的 Buffer 是那一个呢? 
+可以看到有双缓冲, 两个 FixedBuffer, 那么正在写的 FixedBuffer 是那一个呢? 
 跟进源码 `muduo/base/AsyncLogging.cc:79` 可以看到
 
 ```
     {
       muduo::MutexLockGuard lock(mutex_);
-      if (buffers_.empty())  // unusual usage!
+      if (buffers_.Empty())  // unusual usage!
       {
-        cond_.waitForSeconds(flushInterval_);
+        cond.waitForSeconds(flushInterval_);
       }
       buffers_.push_back(std::move(currentBuffer_));
-      currentBuffer_ = std::move(newBuffer1); // 这里是当前写入的 Buffer
+      currentBuffer_ = std::move(newBuffer1); // 这里是当前写入的 FixedBuffer
       buffersToWrite.swap(buffers_);
-      if (!nextBuffer_)
+      if (!next_buffer)
       {
-        nextBuffer_ = std::move(newBuffer2);
+        next_buffer = std::move(newBuffer2);
       }
     }
 ```
@@ -178,17 +178,17 @@ buffersToWrite = std::vector of length 0, capacity 16
 $1 = std::unique_ptr<muduo::detail::FixedBuffer<4000000>> = {get() = 0x7f2547936010}
 ```
 
-可以看到这个 Buffer 是一个 FixedBuffer 的 unique_ptr, 打印原始的对象看看
+可以看到这个 FixedBuffer 是一个 FixedBuffer 的 unique_ptr, 打印原始的对象看看
 
 ```
 (gdb) p *currentBuffer_.get()
-value of type `muduo::detail::FixedBuffer<4000000>' requires 4000016 bytes, which is more than max-value-size
+value of type `muduo::detail::FixedBuffer<4000000>' requires 4000016 bytes, which is more than max-value-Size
 ```
 
 打印不了, 先去掉 gdb 打印的限制
 
 ```
-set max-value-size unlimited
+set max-value-Size unlimited
 set print elements 1000
 ```
 
@@ -197,33 +197,33 @@ set print elements 1000
 ```
 (gdb) p *currentBuffer_.get()
 $3 = {<muduo::noncopyable> = {<No data fields>}, cookie_ = 0x407470 <muduo::detail::FixedBuffer<4000000>::cookieStart()>, 
-  data_ = "20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473234 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473235 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473236 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473237 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473238 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473239 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473240 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473241 - log_coredump_test.cc:27\n20211004 06:48:47.607846Z 21314 INFO  This is a test message, msg_id=473242 - log_coredump_test.cc:27\n20211004 06:48:47.607846Z 21314 INFO  This is a test message, msg_id=473243 - log_"..., 
-  cur_ = 0x7f2547bd08ac "20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342597 - log_coredump_test.cc:27\n20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342598 - log_coredump_test.cc:27\n20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342599 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342600 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342601 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342602 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342603 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342604 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342605 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342606 - log_"...}
+  data = "20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473234 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473235 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473236 - log_coredump_test.cc:27\n20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473237 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473238 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473239 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473240 - log_coredump_test.cc:27\n20211004 06:48:47.607845Z 21314 INFO  This is a test message, msg_id=473241 - log_coredump_test.cc:27\n20211004 06:48:47.607846Z 21314 INFO  This is a test message, msg_id=473242 - log_coredump_test.cc:27\n20211004 06:48:47.607846Z 21314 INFO  This is a test message, msg_id=473243 - log_"..., 
+  cur = 0x7f2547bd08ac "20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342597 - log_coredump_test.cc:27\n20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342598 - log_coredump_test.cc:27\n20211004 06:48:47.569812Z 21314 INFO  This is a test message, msg_id=342599 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342600 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342601 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342602 - log_coredump_test.cc:27\n20211004 06:48:47.569813Z 21314 INFO  This is a test message, msg_id=342603 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342604 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342605 - log_coredump_test.cc:27\n20211004 06:48:47.569814Z 21314 INFO  This is a test message, msg_id=342606 - log_"...}
 ```
 
-有东西了, 可以看到 `FixedBuffer` 有 `data_`, `cur_` 两个属性, 
-从源码可以找到 `data_` 是 `char data_[SIZE]` 以来缓存日志,
-`cur_` 为当前可写入的位置, `data_` ~ `cur_` 即为写在这个 Buffer 日志数据.
+有东西了, 可以看到 `FixedBuffer` 有 `data`, `cur` 两个属性, 
+从源码可以找到 `data` 是 `char data[SIZE]` 以来缓存日志,
+`cur` 为当前可写入的位置, `data` ~ `cur` 即为写在这个 FixedBuffer 日志数据.
 
-`data_ = "20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473234`
+`data = "20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473234`
 这行, 正是我们所期望的下一条日志!
 
-现在把这一块内存 dump 出来, 保存到 `dump.log` 文件
+现在把这一块内存 dump 出来, 保存到 `dump.Log` 文件
 
 ```
-dump binary memory dump.log $1.data_ $1.cur_
+dump binary memory dump.Log $1.data $1.cur
 ```
 
 回到 bash 看一下对不对
 
 ```
--rw-r--r-- 1 zaxtyson users 2.7M 10月  4 15:09 dump.log
+-rw-r--r-- 1 zaxtyson users 2.7M 10月  4 15:09 dump.Log
 ```
 
 看看前 3 条
 
 ```
-➜  muduo_log head -n3 dump.log 
+➜  muduo_log head -n3 dump.Log 
 20211004 06:48:47.607842Z 21314 INFO  This is a test message, msg_id=473234 - log_coredump_test.cc:27
 20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473235 - log_coredump_test.cc:27
 20211004 06:48:47.607844Z 21314 INFO  This is a test message, msg_id=473236 - log_coredump_test.cc:27
@@ -232,7 +232,7 @@ dump binary memory dump.log $1.data_ $1.cur_
 看看后 3 条
 
 ```
-➜  muduo_log tail -n3 dump.log 
+➜  muduo_log tail -n3 dump.Log 
 20211004 06:48:47.614484Z 21314 INFO  This is a test message, msg_id=499997 - log_coredump_test.cc:27
 20211004 06:48:47.614484Z 21314 INFO  This is a test message, msg_id=499998 - log_coredump_test.cc:27
 20211004 06:48:47.614484Z 21314 INFO  This is a test message, msg_id=499999 - log_coredump_test.cc:27

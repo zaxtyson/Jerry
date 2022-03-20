@@ -35,7 +35,7 @@ ulimit -n 1000000
 同时每次测试前, 使用 `sync` 同步脏页数据到磁盘, 通过 `echo 3 > /proc/sys/vm/drop_caches`
 丢弃缓存数据. 尽量保持系统处于稳定和统一的初始条件:
 
-![init_test_env](./imgs/init_test_env.png)
+![init_test_env](images/init_test_env.png)
 
 
 ## Nginx 测压

@@ -2,7 +2,7 @@
 // Created by zaxtyson on 2021/10/8.
 //
 
-#include "AsyncLogger.h"
+#include "AsyncFileAppender.h"
 #include <unistd.h>
 #include <cassert>
 #include <chrono>
@@ -19,18 +19,42 @@ void FixedBuffer::Append(const char* msg, size_t len) {
     }
 }
 
-AsyncLogger::AsyncLogger(std::string_view path, int auto_flush_interval)
+size_t FixedBuffer::AvailableBytes() const {
+    return End() - cur;
+}
+
+size_t FixedBuffer::ReadableBytes() const {
+    return cur - data;
+}
+
+const char* FixedBuffer::Begin() {
+    return data;
+}
+
+const char* FixedBuffer::Begin() const {
+    return data;
+}
+
+const char* FixedBuffer::End() const {
+    return data + sizeof(data);
+}
+
+const char* FixedBuffer::End() {
+    return data + sizeof(data);
+}
+
+void FixedBuffer::Reset() {
+    cur = data;
+}
+
+AsyncFileAppender::AsyncFileAppender(std::string_view path, int auto_flush_interval)
     : auto_flush_interval{auto_flush_interval} {
     log_file.rdbuf()->pubsetbuf(nullptr, 0);
     log_file.open(path.data(), std::ofstream::out | std::ofstream::app);
     assert(log_file.good());
 }
 
-AsyncLogger::~AsyncLogger() {
-    Stop();
-}
-
-void AsyncLogger::Append(const char* msg, size_t len) {
+void AsyncFileAppender::Append(const char* msg, size_t len) {
     std::lock_guard<std::mutex> lock(mtx);
 
     if (cur_buffer->AvailableBytes() >= len) {
@@ -48,10 +72,10 @@ void AsyncLogger::Append(const char* msg, size_t len) {
     cur_buffer = std::move(next_buffer);
     cur_buffer->Append(msg, len);
 
-    cond.notify_one();
+    Flush();
 }
 
-void AsyncLogger::FlushThread() {
+void AsyncFileAppender::FlushThread() {
     BufferPtr tmp_buffer1 = std::make_unique<FixedBuffer>();
     BufferPtr tmp_Buffer2 = std::make_unique<FixedBuffer>();
     BufferVector buffers_to_write;
@@ -102,19 +126,22 @@ void AsyncLogger::FlushThread() {
     }
 }
 
-void AsyncLogger::Start() {
+void AsyncFileAppender::Start() {
     th = std::thread([this]() { FlushThread(); });
     // block caller thread until flush thread start
     latch.Wait();
 }
 
-void AsyncLogger::Stop() {
+void AsyncFileAppender::Stop() {
+    // wait flush to finished
+    Flush();
+    stop.store(true);
+    th.join();
+}
+
+void AsyncFileAppender::Flush() {
     // wake up flush thread and flush unfilled buffer right now
     cond.notify_one();
-    stop.store(true);
-
-    // wait flush to finished
-    th.join();
 }
 
 }  // namespace jerry::logger

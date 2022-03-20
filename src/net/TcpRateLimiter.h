@@ -4,19 +4,34 @@
 
 #ifndef JERRY_TCPLIMITER_H
 #define JERRY_TCPLIMITER_H
-#include <utils/NonCopyable.h>
 
-namespace jerry::net{
-class TcpLimiter:NonCopyable {
-  public:
-    TcpLimiter() = default;
-    virtual ~TcpLimiter() = default;
+#include <cstddef>  // size_t
+#include "utils/NonCopyable.h"
 
-  public:
-    virtual bool  
+namespace jerry::net {
+
+class TcpConn;
+
+struct TcpRateLimiterConfig {
+    size_t max_conns_per_ip = 0;
+    size_t max_conns_per_io_worker = 0;
+    size_t max_qps_per_host = 0;
+    size_t max_qps_per_io_worker = 0;
 };
-}
 
+class TcpRateLimiter : NonCopyable {
+  public:
+    explicit TcpRateLimiter(const TcpRateLimiterConfig& config);
+    virtual ~TcpRateLimiter() = default;
+
+  public:
+    virtual bool ReachConnectionLimits(TcpConn* conn);
+    virtual bool ReachQpsLimits(TcpConn* conn);
+
+  private:
+    TcpRateLimiterConfig config;
+};
+}  // namespace jerry::net
 
 
 #endif  // JERRY_TCPLIMITER_H

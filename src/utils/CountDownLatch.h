@@ -7,7 +7,7 @@
 
 #include <condition_variable>
 #include <mutex>
-#include "utils/NonCopyable.h"
+#include "NonCopyable.h"
 
 namespace jerry::utils {
 

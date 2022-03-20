@@ -6,59 +6,64 @@
 #define JERRY_LOGGER_H
 
 #include <utils/NonCopyable.h>
-#include <utils/log/AsyncLogger.h>
-#include <utils/log/LoggerOutput.h>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
+#include "Appender.h"
+#include "AsyncFileAppender.h"
 
-namespace jerry::utils::logger {
-
-constexpr const int kBufferSize = 1024;
+namespace jerry::logger {
 
 enum class LogLevel : uint8_t { kDebug, kInfo, kWarn, kError, kFatal };
 
 class Logger : NonCopyable {
   public:
-    static Logger& GetInstance();
+    Logger() = default;
+    ~Logger() = default;
+
     static void SetLogLevel(LogLevel level);
-    static void SetOutput(LoggerOutput* output);
+    static LogLevel GetLogLevel();
+    static void SetAppender(Appender* appender);
     static void Log(LogLevel level, char* msg);
 
   private:
-    inline static LogLevel global_log_level{LogLevel::kInfo};
-    inline static LoggerOutput* output{new DefaultLoggerOutput()};
+    inline static LogLevel global_level{LogLevel::kInfo};
+    inline static std::unique_ptr<Appender> appender{new StderrAppender()};
 };
 
 const char* GetLogLevelString(LogLevel level);
 
+
 #define __FILE_NAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define __LOGGER_LEVEL__(level) (getLoggerLevelName(level))
+#define __LOGGER_LEVEL__(level) (GetLogLevelString(level))
 
 #ifndef SHOW_LOG
-#define LOG_BASE(level, fmt, ...) ((void)0)
+#define LOG_BASE(level, fmt, ...) ((void)0);
 #else
 #define LOG_BASE(level, fmt, ...)                                   \
-    do {                                                            \
-        char buf[kBufferSize];                                      \
+    if (level >= Logger::GetLogLevel()) {                           \
+        char buf[1024];                                             \
         snprintf(buf,                                               \
-                 kBufferSize,                                       \
+                 sizeof(buf),                                       \
                  "0000-00-00 00:00:00.000000 %s %s:%d - " fmt "\n", \
                  __LOGGER_LEVEL__(level),                           \
                  __FILE_NAME__,                                     \
                  __LINE__,                                          \
                  ##__VA_ARGS__);                                    \
-        Logger::GetInstance().Log(level, buf);                      \
-    } while (0)
+        Logger::Log(level, buf);                                    \
+    }
 #endif
-
 
 #define LOG_DEBUG(fmt, ...) LOG_BASE(LogLevel::kDebug, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) LOG_BASE(LogLevel::kInfo, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) LOG_BASE(LogLevel::kError, fmt, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) LOG_BASE(LogLevel::kWarn, fmt, ##__VA_ARGS__)
-#define LOG_FATAL(fmt, ...) LOG_BASE(LogLevel::kFatal, fmt, ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...) LOG_BASE(LogLevel::kFatal, fmt, ##__VA_ARGS__);
 
-}  // namespace jerry::utils::logger
+}  // namespace jerry::logger
+
+using jerry::logger::Logger;
+using jerry::logger::LogLevel;
 
 #endif  // JERRY_LOGGER_H

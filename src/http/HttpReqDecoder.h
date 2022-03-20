@@ -2,21 +2,43 @@
 // Created by zaxtyson on 2022/3/18.
 //
 
-#ifndef JERRY_HTTPRESPDECODER_H
-#define JERRY_HTTPRESPDECODER_H
+#ifndef JERRY_HTTPREQDECODER_H
+#define JERRY_HTTPREQDECODER_H
 
-#include "HttpResp.h"
-#include <codec/Decoder.h>
+#include <map>
+#include "HttpReq.h"
+#include "net/BaseBuffer.h"
 
 namespace jerry::http {
 
-class HttpRespDecoder : public codec::BaseDecoder<HttpResp> {
+class HttpReqDecoder {
   public:
-    explicit HttpRespDecoder(BaseDecoder::buffer_type& buffer) : BaseDecoder<HttpResp>(buffer) {}
+    explicit HttpReqDecoder(net::BaseBuffer& buffer);
+    ~HttpReqDecoder() = default;
 
-    std::optional<HttpResp> Decode() override { return std::nullopt; }
+    std::optional<HttpReq> Decode();
+    void SetBodyMaxBytes(size_t n);
+
+  private:
+    bool ParseRequestLine();
+    bool ParseHeaders();
+    bool ParseBody();
+
+
+  private:
+    enum class State { kExpectRequestLine, kExpectHeaders, kExpectBody, kParseFinished };
+
+  private:
+    HttpReq req{};
+    size_t body_max_bytes{2 * 1024 * 1024};  // default 2MB
+    State state{State::kExpectRequestLine};
+    net::BaseBuffer& buffer;
+
+  private:
+    static const std::map<std::string, HttpReq::Method> method_map;
+    static const std::map<std::string, HttpReq::HttpVersion> version_map;
 };
 
 }  // namespace jerry::http
 
-#endif  // JERRY_HTTPRESPDECODER_H
+#endif  // JERRY_HTTPREQDECODER_H

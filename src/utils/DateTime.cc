@@ -7,6 +7,40 @@
 
 namespace jerry::utils {
 
+DateTime::DateTime(int64_t us_since_epoch) : us_since_epoch{us_since_epoch} {}
+
+DateTime DateTime::AfterSeconds(double seconds) const {
+    return DateTime(us_since_epoch + static_cast<int64_t>(seconds * kMicroSecondsPerSecond));
+}
+
+DateTime DateTime::AfterMicroSeconds(int64_t micro_seconds) const {
+    return DateTime(us_since_epoch + micro_seconds);
+}
+
+bool DateTime::operator<(const DateTime& other) const {
+    return us_since_epoch < other.us_since_epoch;
+}
+
+bool DateTime::operator<=(const DateTime& other) const {
+    return us_since_epoch <= other.us_since_epoch;
+}
+
+bool DateTime::operator>(const DateTime& other) const {
+    return us_since_epoch > other.us_since_epoch;
+}
+
+bool DateTime::operator>=(const DateTime& other) const {
+    return us_since_epoch >= other.us_since_epoch;
+}
+
+bool DateTime::operator==(const DateTime& other) const {
+    return us_since_epoch == other.us_since_epoch;
+}
+
+int64_t DateTime::operator-(const DateTime& other) const {
+    return us_since_epoch - other.us_since_epoch;
+}
+
 DateTime DateTime::Now() {
     timeval tv{};
     gettimeofday(&tv, nullptr);
@@ -14,9 +48,10 @@ DateTime DateTime::Now() {
 }
 
 std::string DateTime::ToString() const {
-    char buf[27] = {0};
-    auto secs = static_cast<time_t>(ms_since_epoch / kMicroSecondsPerSecond);
-    int ms = static_cast<int>(ms_since_epoch % kMicroSecondsPerSecond);
+    // TODO: Using caching to optimize the format performance
+    char buf[27]{};
+    auto secs = static_cast<time_t>(us_since_epoch / kMicroSecondsPerSecond);
+    int us = static_cast<int>(us_since_epoch % kMicroSecondsPerSecond);
     tm tm_time{};
     gmtime_r(&secs, &tm_time);
     snprintf(buf,
@@ -28,12 +63,16 @@ std::string DateTime::ToString() const {
              tm_time.tm_hour + 8,
              tm_time.tm_min,
              tm_time.tm_sec,
-             ms);
+             us);
     return buf;
 }
 
-DateTime DateTime::AfterSeconds(double seconds) const {
-    return DateTime(ms_since_epoch + static_cast<int64_t>(seconds * kMicroSecondsPerSecond));
+std::string DateTime::ToGmtString() const {
+    char buf[30]{};
+    time_t secs = us_since_epoch / kMicroSecondsPerSecond;
+    tm* gmt_time = gmtime(&secs);
+    strftime(buf, sizeof(buf), "%a, %d %b %Y %T GMT", gmt_time);
+    return buf;
 }
 
 }  // namespace jerry::utils

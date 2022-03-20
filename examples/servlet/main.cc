@@ -9,7 +9,7 @@
 #include "TestServlet.hpp"
 
 int main() {
-    AsyncLogger logger("./servlet.log");
+    AsyncLogger logger("./servlet.logger");
 //    logger.setAutoFlushInterval(3);  // default
     Logger::setOutput(&logger);
     Logger::setLogLevel(LogLevel::kInfo);

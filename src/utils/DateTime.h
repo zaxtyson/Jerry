@@ -5,6 +5,7 @@
 #ifndef JERRY_DATETIME_H
 #define JERRY_DATETIME_H
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 
@@ -14,7 +15,7 @@ namespace utils {
 class DateTime {
   public:
     DateTime() = default;
-    explicit DateTime(int64_t micro_sec_since_epoch) : ms_since_epoch{micro_sec_since_epoch} {}
+    explicit DateTime(int64_t us_since_epoch);
     ~DateTime() = default;
 
     /**
@@ -30,23 +31,33 @@ class DateTime {
      */
     DateTime AfterSeconds(double seconds) const;
 
+    DateTime AfterMicroSeconds(int64_t micro_seconds) const;
+
     /**
-     * Convert current time to string, format:  2021-09-19 16:20:25.944865
+     * Convert current time to string, format: "2021-09-19 16:20:25.944865"
      * @return datetime string
      */
     std::string ToString() const;
 
+    /**
+     *  Convert current time to GMT string, format: "Sun, 06 Nov 1994 08:49:37 GMT"
+     * @return datetime string
+     */
+    std::string ToGmtString() const;
+
   public:
-    bool operator<(const DateTime& other) const { return ms_since_epoch < other.ms_since_epoch; }
-    bool operator<=(const DateTime& other) const { return ms_since_epoch <= other.ms_since_epoch; }
-    bool operator==(const DateTime& other) const { return ms_since_epoch == other.ms_since_epoch; }
-    int64_t operator-(const DateTime& other) const { return ms_since_epoch - other.ms_since_epoch; }
+    bool operator<(const DateTime& other) const;
+    bool operator<=(const DateTime& other) const;
+    bool operator>(const DateTime& other) const;
+    bool operator>=(const DateTime& other) const;
+    bool operator==(const DateTime& other) const;
+    int64_t operator-(const DateTime& other) const;
 
   public:
     inline static int kMicroSecondsPerSecond{1000000};
 
   private:
-    int64_t ms_since_epoch{};
+    int64_t us_since_epoch{};  // microseconds from epoch
 };
 }  // namespace utils
 

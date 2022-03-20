@@ -1,9 +1,11 @@
+set(EXECUTABLE_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/dist/examples")
+set(LIBRARY_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/dist/examples")
 
 add_executable(EchoServer EchoServer.cc)
-target_link_libraries(EchoServer server_core pthread)
+target_link_libraries(EchoServer ${JERRY_LIB} pthread)
 
+add_executable(TimerServer TimerServer.cc)
+target_link_libraries(TimerServer ${JERRY_LIB} pthread)
 
-add_executable(StaticPage StaticPage.cc)
-target_link_libraries(StaticPage server_core pthread)
-
-add_subdirectory(servlet)
+add_executable(DemoHttpServer DemoHttpServer.cc)
+target_link_libraries(DemoHttpServer ${JERRY_LIB} pthread)

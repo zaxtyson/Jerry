@@ -2,39 +2,48 @@
 // Created by zaxtyson on 2022/3/12.
 //
 
-#include "TimerWorker.h"
-#include <utils/FdHelper.h>
+#include "TimerQueue.h"
 #include <cassert>
 #include "Channel.h"
+#include "IOWorker.h"
 #include "Poller.h"
+#include "logger/Logger.h"
+#include "utils/FdHelper.h"
 
 namespace jerry::net {
 
-void TimerWorker::Init(Poller* poller) {
-    this->poller = poller;
+TimerQueue::TimerQueue(IOWorker* worker) {
+    this->worker = worker;
     int timer_fd = utils::CreateTimerFd();
-    assert(timer_fd > 0);
+    if (timer_fd == -1) {
+        LOG_FATAL("Create timer fd failed")
+    }
+    LOG_DEBUG("Create timer fd = %d success", timer_fd)
 
     timer_channel = new Channel(timer_fd);
-    timer_channel->SetPoller(poller);
+    timer_channel->SetPoller(worker->GetPoller());
 
-    ChannelCallback callback;
-    callback.OnReadable = [this](const DateTime& time) { this->OnTimeout(time); };
-    timer_channel->SetCallback(callback);
+    ChannelCallback timer_callback;
+    timer_callback.OnReadable = [this](const DateTime& time) { this->OnTimeout(time); };
+    timer_channel->SetCallback(std::move(timer_callback));
+    timer_channel->AddToPoller();
     timer_channel->ActivateReading();
 }
 
-TimerWorker::~TimerWorker() {
+TimerQueue::~TimerQueue() {
     delete timer_channel;
 }
 
-int64_t TimerWorker::GetNextTimeout() const {
+int64_t TimerQueue::GetNextTimeout() const {
     std::lock_guard<std::mutex> lock(mtx);
+    if (waiting_timers.empty()) {
+        return -1;  // no timers
+    }
     auto timeout = waiting_timers.top()->expire - DateTime::Now();
     return timeout > 0 ? timeout : 0;
 }
 
-std::vector<TimerWorker::TimerStruct*> TimerWorker::PopExpiredTimers() {
+std::vector<TimerQueue::TimerStruct*> TimerQueue::PopExpiredTimers() {
     std::vector<TimerStruct*> expired_timers;
     if (waiting_timers.empty()) {
         return expired_timers;
@@ -42,10 +51,10 @@ std::vector<TimerWorker::TimerStruct*> TimerWorker::PopExpiredTimers() {
 
     std::lock_guard<std::mutex> lock(mtx);
     auto now = DateTime::Now();
-    for (auto i = 0; i < waiting_timers.size(); i++) {
+    for (size_t i = 0; i < waiting_timers.size(); i++) {
         auto* timer = waiting_timers.top();
 
-        // traversed an unexpired timer, stop
+        // traversed an unexpired timer, stop_loop
         if (timer->expire > now) {
             break;
         }
@@ -58,15 +67,23 @@ std::vector<TimerWorker::TimerStruct*> TimerWorker::PopExpiredTimers() {
     return expired_timers;
 }
 
-void TimerWorker::OnTimeout(const DateTime& time) {
+void TimerQueue::OnTimeout([[maybe_unused]] const DateTime& time) {
+    auto timer_fd = timer_channel->GetFd();
+
     // drop the data to prevent busy-loop
-    uint64_t n;
-    read(timer_channel->GetFd(), &n, sizeof(n));
+    uint64_t value;
+    [[maybe_unused]] size_t rd = read(timer_fd, &value, sizeof(value));
+    assert(rd == sizeof(value));
 
     auto expired_timers = PopExpiredTimers();
+    LOG_DEBUG("Pop %zu expired timer(s), timer fd = %d", expired_timers.size(), timer_fd)
 
     // update time of next timeout
-    utils::SetTimerFd(timer_channel->GetFd(), GetNextTimeout());
+    auto next_timeout = GetNextTimeout();
+    if (next_timeout != -1) {
+        LOG_DEBUG("The timer fd = %d will wakeup after %ldus", timer_fd, next_timeout)
+        utils::SetTimerFd(timer_channel->GetFd(), next_timeout);
+    }
 
     // handle expired timers
     for (auto* timer : expired_timers) {
@@ -74,17 +91,19 @@ void TimerWorker::OnTimeout(const DateTime& time) {
     }
 }
 
-void TimerWorker::HandleTimer(TimerWorker::TimerStruct* timer) {
+void TimerQueue::HandleTimer(TimerQueue::TimerStruct* timer) {
     // task canceled
     if (timer->canceled) {
+        LOG_DEBUG("Timer tid = %ld was canceled, remove it", timer->tid)
         std::lock_guard<std::mutex> lock(mtx);
         timers_map.erase(timer->tid);
         delete timer;
         return;
     }
 
-    // task stop
+    // task stop_loop
     if (timer->stop_condition && timer->stop_condition()) {
+        LOG_DEBUG("Timer tid = %ld meets the stopping condition, remove it", timer->tid)
         std::lock_guard<std::mutex> lock(mtx);
         timers_map.erase(timer->tid);
         delete timer;
@@ -92,7 +111,10 @@ void TimerWorker::HandleTimer(TimerWorker::TimerStruct* timer) {
     }
 
     // execute task
-    timer->task();
+    if (timer->task) {
+        LOG_DEBUG("Timer tid = %ld timeout, execute the bound task...", timer->tid)
+        timer->task();
+    }
 
     // if task repeatable
     if (timer->repeat_times > 0) {
@@ -107,7 +129,7 @@ void TimerWorker::HandleTimer(TimerWorker::TimerStruct* timer) {
     delete timer;
 }
 
-TimerWorker::TimerId TimerWorker::AddTimer(TimerWorker::TimerStruct* timer) {
+TimerQueue::TimerId TimerQueue::AddTimer(TimerQueue::TimerStruct* timer) {
     if (timer->expire <= DateTime::Now()) {
         return -1;
     }
@@ -117,6 +139,8 @@ TimerWorker::TimerId TimerWorker::AddTimer(TimerWorker::TimerStruct* timer) {
     if (waiting_timers.empty() || timer->expire < waiting_timers.top()->expire) {
         int64_t next_timeout = timer->expire - DateTime::Now();
         utils::SetTimerFd(timer_channel->GetFd(), next_timeout);
+        LOG_DEBUG(
+            "The timer fd = %d will wakeup after %ldus", timer_channel->GetFd(), next_timeout)
     }
 
     // id is invalid
@@ -129,7 +153,7 @@ TimerWorker::TimerId TimerWorker::AddTimer(TimerWorker::TimerStruct* timer) {
     return timer->tid;
 }
 
-TimerWorker::TimerId TimerWorker::AddTimer(const DateTime& when, TimerWorker::Task&& task) {
+TimerQueue::TimerId TimerQueue::AddTimer(const DateTime& when, TimerQueue::Task&& task) {
     auto* timer = new TimerStruct();
     timer->expire = when;
     timer->repeat_times = 0;
@@ -139,34 +163,8 @@ TimerWorker::TimerId TimerWorker::AddTimer(const DateTime& when, TimerWorker::Ta
     return AddTimer(timer);
 }
 
-TimerWorker::TimerId TimerWorker::AddTimer(int64_t interval,
-                                           size_t repeat_times,
-                                           TimerWorker::Task&& task) {
-    auto* timer = new TimerStruct();
-    timer->expire = DateTime::Now().AfterMicroSeconds(interval);
-    timer->repeat_times = repeat_times;
-    timer->repeat_interval = interval;
-    timer->stop_condition = nullptr;
-    timer->task = std::move(task);
-
-    return AddTimer(timer);
-}
-
-TimerWorker::TimerId TimerWorker::AddTimer(int64_t interval,
-                                           TimerWorker::StopCondition&& until,
-                                           TimerWorker::Task&& task) {
-    auto* timer = new TimerStruct();
-    timer->expire = DateTime::Now().AfterMicroSeconds(interval);
-    timer->repeat_times = 0;
-    timer->repeat_interval = interval;
-    timer->stop_condition = nullptr;
-    timer->task = std::move(task);
-    timer->stop_condition = std::move(until);
-
-    return AddTimer(timer);
-}
-
-bool TimerWorker::CancelTimer(TimerWorker::TimerId tid) {
+bool TimerQueue::CancelTimer(TimerQueue::TimerId tid) {
+    LOG_DEBUG("Timer tid = %ld is marked as canceled", tid)
     std::lock_guard<std::mutex> lock(mtx);
     auto target = timers_map.find(tid);
     if (target == std::end(timers_map)) {
@@ -176,10 +174,9 @@ bool TimerWorker::CancelTimer(TimerWorker::TimerId tid) {
     return true;
 }
 
-size_t TimerWorker::GetTotalTimers() const {
+size_t TimerQueue::GetTimerNums() const {
     std::lock_guard<std::mutex> lock(mtx);
     return waiting_timers.size();
 }
-
 
 }  // namespace jerry::net

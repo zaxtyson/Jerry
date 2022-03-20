@@ -3,31 +3,30 @@
 //
 
 #include "Logger.h"
-#include <errno.h>
-#include <string.h>
 #include <sys/time.h>
+#include <cerrno>
+#include <cstring>
 #include <map>
 
-namespace jerry::utils::logger {
+namespace jerry::logger {
 
 const char* GetLogLevelString(LogLevel level) {
-    static const std::map<LogLevel, const char*> level_map = {{LogLevel::kDebug, "DEBUG"},
-                                                              {LogLevel::kInfo, "INFO"},
-                                                              {LogLevel::kWarn, "WARN"},
-                                                              {LogLevel::kError, "ERROR"},
-                                                              {LogLevel::kFatal, "FATAL"}};
+    static const std::map<LogLevel, const char*> level_map = {{LogLevel::kDebug, "[DEBUG]"},
+                                                              {LogLevel::kInfo, "[INFO]"},
+                                                              {LogLevel::kWarn, "[WARN]"},
+                                                              {LogLevel::kError, "[ERROR]"},
+                                                              {LogLevel::kFatal, "[FATAL]"}};
     return level_map.at(level);
 }
 
 void FormatNowString(char* buffer) {
-    // 将 buffer 前面 26 个字符填充为当前时间
-    // 年月日时分秒缓存, 毫秒才格式化
+    // only format milliseconds
     static time_t lastSecond = 0;
     static char prefixOfTime[21] = {0};
     static timeval tv{};
 
     gettimeofday(&tv, nullptr);
-    // 秒数改变时才格式化一次
+    // format when seconds changed
     if (lastSecond != tv.tv_sec) {
         lastSecond = tv.tv_sec;
         tm tm_time{};
@@ -45,40 +44,37 @@ void FormatNowString(char* buffer) {
     // "2021-00-00 00:00:00.000000" len = 26
     snprintf(buffer, 27, "%s%06ld", prefixOfTime, tv.tv_usec / 1000);
     // buffer = "2021-00-00 00:00:00.000000" "\0" "other str"
-    buffer[26] = ' ';  // 去掉第 27 个字符 '\0'
-}
-
-
-Logger& Logger::GetInstance() {
-    static Logger logger;
-    return logger;
+    buffer[26] = ' ';  // remove '\0'
 }
 
 void Logger::SetLogLevel(LogLevel level) {
-    global_log_level = level;
+    global_level = level;
 }
 
 void Logger::Log(LogLevel level, char* msg) {
-    // 只打印级别高于或等于全局日志的级别的log
-    if (level < global_log_level) {
+    if (level < global_level) {
         return;
     }
-    FormatNowString(msg);  // 填上时间
-    output->append(msg, strlen(msg));
 
-    // FATAL 级别的错误直接终止程序
+    FormatNowString(msg);
+    appender->Append(msg, strlen(msg));
+
     if (level == LogLevel::kFatal) {
         char err_msg[128];
         snprintf(err_msg, sizeof(err_msg), "Terminate reason: %s\n", strerror(errno));
-        output->append(err_msg, strlen(err_msg));
-        output->stop();
+        appender->Append(err_msg, strlen(err_msg));
+        appender->Flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // wait for async flush
         abort();
     }
 }
 
-void Logger::SetOutput(LoggerOutput* output) {
-    delete output;
-    output = output;
+void Logger::SetAppender(Appender* appender) {
+    Logger::appender.reset(appender);
 }
 
-}  // namespace jerry::utils::logger
+LogLevel Logger::GetLogLevel() {
+    return Logger::global_level;
+}
+
+}  // namespace jerry::logger
