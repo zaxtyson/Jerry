@@ -5,26 +5,27 @@
 #ifndef JERRY_COUNTDOWNLATCH_H
 #define JERRY_COUNTDOWNLATCH_H
 
-#include <mutex>
 #include <condition_variable>
-#include <utils/NonCopyable.h>
+#include <mutex>
+#include "utils/NonCopyable.h"
+
+namespace jerry::utils {
 
 class CountDownLatch : NonCopyable {
-public :
+  public:
     explicit CountDownLatch(int count);
-
     ~CountDownLatch() = default;
 
-    void wait();
+    void Wait();
+    void CountDown();
+    int GetCount() const;
 
-    void countDown();
-
-    int getCount() const;
-private:
-    std::mutex mtx_{};
-    std::condition_variable cond_;
-    int count_;
+  private:
+    std::mutex mtx{};
+    std::condition_variable cond{};
+    int count;
 };
 
+}  // namespace jerry::utils
 
-#endif //JERRY_COUNTDOWNLATCH_H
+#endif  // JERRY_COUNTDOWNLATCH_H

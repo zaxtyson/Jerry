@@ -1,79 +1,78 @@
 //
-// Created by zaxtyson on 2021/10/2.
+// Created by zaxtyson on 2022/3/12.
 //
 
-#ifndef JERRY_TIMERQUEUE_H
-#define JERRY_TIMERQUEUE_H
+#ifndef JERRY_TIMERWORKER_H
+#define JERRY_TIMERWORKER_H
 
-#include <queue>
-#include <map>
-#include <net/Channel.h>
-#include <net/Timer.h>
+#include <utils/DateTime.h>
 #include <utils/NonCopyable.h>
+#include <atomic>
+#include <functional>
+#include <map>
+#include <mutex>
+#include <queue>
 
-class EventLoop;
 
-/**
- * 用于组织定时器, 每个事件循环都有一个
- */
-class TimerQueue : NonCopyable {
-public:
-    // 用于容器排序
-    struct cmp {
-        bool operator()(Timer *lhs, Timer *rhs) { return *rhs < *lhs; }
+namespace jerry::net {
+
+class Poller;
+class Channel;
+
+class TimerWorker : NonCopyable {
+  public:
+    using TimerId = int64_t;
+    using Task = std::function<void()>;
+    using StopCondition = std::function<bool()>;
+
+  public:
+    TimerWorker() = default;
+    ~TimerWorker();
+
+    void Init(Poller* poller);
+    size_t GetTotalTimers() const;
+    TimerId AddTimer(const DateTime& when, Task&& task);
+    TimerId AddTimer(int64_t interval, size_t repeat_times, Task&& task);
+    TimerId AddTimer(int64_t interval, StopCondition&& until, Task&& task);
+    bool CancelTimer(TimerId tid);
+
+  private:
+    struct TimerStruct {
+        Task task;
+        StopCondition stop_condition;
+        bool canceled{false};
+        TimerId tid{-1};
+        DateTime expire;
+        size_t repeat_times;
+        int64_t repeat_interval;  // us
     };
 
-    using TimerContainer = std::priority_queue<Timer *, std::vector<Timer *>, cmp>;  // 小根堆
-    using TimerIdMap = std::map<TimerId, Timer *>;
+    struct TimerCmp {
+        bool operator()(TimerStruct* lhs, TimerStruct* rhs) { return lhs->expire < rhs->expire; }
+    };
 
-public:
-    explicit TimerQueue(EventLoop *loop);
+  private:
+    void OnTimeout(const DateTime& time);
+    void HandleTimer(TimerStruct* timer);
+    TimerId AddTimer(TimerStruct* timer);
+    std::vector<TimerStruct*> PopExpiredTimers();
+    int64_t GetNextTimeout() const;
 
-    ~TimerQueue();
 
-    TimerId addTimer(Date when, Timer::Callback &&callback);
+  private:
+    mutable std::mutex mtx{};
+    Poller* poller{};
+    Channel* timer_channel{};
+    std::map<TimerId, TimerStruct*> timers_map{};
+    std::priority_queue<TimerStruct*, std::vector<TimerStruct*>, TimerCmp> waiting_timers{};
 
-    TimerId addTimer(double interval, int repeatTimes, Timer::Callback &&callback);
-
-    TimerId addTimer(double interval, Timer::Callback &&callback, Timer::StopCondition &&stopCondition);
-
-    /**
-     * 取消一个定时器
-     * @param timerId 定时器 ID
-     */
-    void cancelTimer(TimerId timerId);
-
-private:
-    /**
-     * 当 timerfd 可读时, 说明有定时器超时, 调用本函数处理
-     */
-    void handleTimeoutEvent();
-
-    /**
-     * 从容器中弹出已经过期的定时器
-     * @param date 该时间以前的定时器将被弹出
-     * @return
-     */
-    std::vector<Timer *> popExpiredTimers();
-
-    /**
-     * 获取超时时间最近的计时器的过期时间
-     * @return
-     */
-    Date getNearestTimerExpiration();
-
-    // 确保在事件循环中操作, 保证线程安全
-    void addTimerInLoop(Timer *newTimer);
-
-    void cancelInLoop(TimerId timerId);
-
-private:
-    EventLoop *loop_;
-    int timerFd_;
-    Channel timerFdChannel_;
-    TimerContainer timers_{};
-    TimerIdMap timerIdMap_{};
+  private:
+    inline static std::atomic<TimerId> next_timer_id{};
 };
 
+using TimerId = TimerWorker::TimerId;
 
-#endif //JERRY_TIMERQUEUE_H
+}  // namespace jerry::net
+
+
+#endif  // JERRY_TIMERWORKER_H

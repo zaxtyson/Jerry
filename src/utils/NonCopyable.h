@@ -5,25 +5,27 @@
 #ifndef JERRY_NONCOPYABLE_H
 #define JERRY_NONCOPYABLE_H
 
-/**
- * 工具类, 禁止子类被拷贝
- */
+namespace jerry {
+namespace utils {
 class NonCopyable {
-protected:
+  public:
     NonCopyable() = default;
-
     ~NonCopyable() = default;
 
-    // 删除拷贝构造和拷贝赋值
-    NonCopyable(const NonCopyable &) = delete;
+    // forbid copy
+    NonCopyable(const NonCopyable&) = delete;
+    NonCopyable& operator=(const NonCopyable&) = delete;
 
-    NonCopyable &operator=(const NonCopyable &) = delete;
-
-    // 允许移动语义
-    NonCopyable(NonCopyable &&) noexcept = default;
-
-    NonCopyable &operator=(NonCopyable &&) noexcept = default;
+    // allowed move
+    NonCopyable(NonCopyable&&) noexcept = default;
+    NonCopyable& operator=(NonCopyable&&) noexcept = default;
 };
+}  // namespace utils
+
+// for ease of use
+using jerry::utils::NonCopyable;
+
+}  // namespace jerry
 
 
-#endif //JERRY_NONCOPYABLE_H
+#endif  // JERRY_NONCOPYABLE_H

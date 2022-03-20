@@ -1,142 +1,185 @@
 //
-// Created by zaxtyson on 2021/10/2.
+// Created by zaxtyson on 2022/3/12.
 //
 
-#include <net/TimerQueue.h>
+#include "TimerWorker.h"
 #include <utils/FdHelper.h>
 #include <cassert>
-#include <utils/log/Logger.h>
-#include <net/EventLoop.h>
+#include "Channel.h"
+#include "Poller.h"
 
-TimerQueue::TimerQueue(EventLoop *loop) :
-        loop_(loop), timerFd_(createTimerFd()) {
+namespace jerry::net {
 
-    timerFdChannel_.setFd(timerFd_);
-    timerFdChannel_.enableReading();
-    timerFdChannel_.setReadCallback([this](Date _) { handleTimeoutEvent(); });
-    loop->addChannel(&timerFdChannel_);
+void TimerWorker::Init(Poller* poller) {
+    this->poller = poller;
+    int timer_fd = utils::CreateTimerFd();
+    assert(timer_fd > 0);
+
+    timer_channel = new Channel(timer_fd);
+    timer_channel->SetPoller(poller);
+
+    ChannelCallback callback;
+    callback.OnReadable = [this](const DateTime& time) { this->OnTimeout(time); };
+    timer_channel->SetCallback(callback);
+    timer_channel->ActivateReading();
 }
 
+TimerWorker::~TimerWorker() {
+    delete timer_channel;
+}
 
-void TimerQueue::addTimerInLoop(Timer *newTimer) {
-    loop_->assertInLoopThread();
-    LOG_DEBUG("Add Timer(id=%lu), timeout at %s", newTimer->getTimerId(),
-              newTimer->getExpiration().toString().c_str());
-    timerIdMap_[newTimer->getTimerId()] = newTimer;
+int64_t TimerWorker::GetNextTimeout() const {
+    std::lock_guard<std::mutex> lock(mtx);
+    auto timeout = waiting_timers.top()->expire - DateTime::Now();
+    return timeout > 0 ? timeout : 0;
+}
 
-    // 还没有定时器, 或者这个定时器的过期时间比最小堆的都早,
-    // 则下一次 timerfd 触发时间就设定为这个定时器的过期时间
-    if (timers_.empty() || newTimer->getExpiration() < getNearestTimerExpiration()) {
-        LOG_DEBUG("Update timerfd(fd=%d) in poller(fd=%d), set next timeout at %s", timerFd_, loop_->getPollerFd(),
-                  newTimer->getExpiration().toString().c_str());
-        // 在 Loop 中添加定时器可能要排队, 因此加入时可能已经超时
-        auto us = newTimer->getExpiration() - Date::now();
-        us = (us > 0) ? us : 0;  // 超时的立刻触发
-        setTimerFd(timerFd_, us);
+std::vector<TimerWorker::TimerStruct*> TimerWorker::PopExpiredTimers() {
+    std::vector<TimerStruct*> expired_timers;
+    if (waiting_timers.empty()) {
+        return expired_timers;
     }
 
-    timers_.push(newTimer);
-}
+    std::lock_guard<std::mutex> lock(mtx);
+    auto now = DateTime::Now();
+    for (auto i = 0; i < waiting_timers.size(); i++) {
+        auto* timer = waiting_timers.top();
 
-void TimerQueue::cancelTimer(TimerId timerId) {
-    loop_->runInLoop([this, timerId]() { this->cancelInLoop(timerId); });
-}
-
-void TimerQueue::cancelInLoop(TimerId timerId) {
-    loop_->assertInLoopThread();
-    if (timerIdMap_.find(timerId) != timerIdMap_.end()) {
-        LOG_DEBUG("Timer(id=%lu) has been cancelled", timerIdMap_[timerId]->getTimerId());
-        timerIdMap_[timerId]->cancel();  // 取消该计时器, 先不删除
-        timerIdMap_.erase(timerId); // 不再记录它
-    }
-}
-
-void TimerQueue::handleTimeoutEvent() {
-    loop_->assertInLoopThread();
-    // 取走 timerfd 的数据
-    uint64_t n;
-    read(timerFd_, &n, sizeof(n));
-
-    // 获取超时的计时器
-    auto expiredTimers = popExpiredTimers();
-    LOG_DEBUG("Poller(fd=%d) get expired Timers: %zu", loop_->getPollerFd(), expiredTimers.size());
-
-    // 设置 timerfd 下一次触发时间为未超时的定时器中最早触发的那个
-    if (!timers_.empty()) {
-        int64_t nextTimeout = getNearestTimerExpiration() - Date::now();
-        nextTimeout = (nextTimeout > 0) ? nextTimeout : 0;
-        setTimerFd(timerFd_, nextTimeout);
-    }
-
-    for (auto &timer: expiredTimers) {
-        timer->run(); // 执行定时器回调
-
-        // 更新定时器状态, 如果可以再次触发, 则加入到定时器队列
-        timer->update();
-        if (!timer->isCanceled()) {
-            addTimerInLoop(timer);
-        } else {
-            // 否则删除之
-            delete timer;
-        }
-    }
-}
-
-std::vector<Timer *> TimerQueue::popExpiredTimers() {
-    std::vector<Timer *> expiredTimers;
-    if (timers_.empty()) return expiredTimers;
-
-    Date now = Date::now();
-    for (int i = 0; i < timers_.size(); i++) {
-        Timer *timer = timers_.top();
-        // 如果定时器已经取消了, 丢弃
-        if (timer->isCanceled()) {
-            timers_.pop();
-            delete timer; // 没用智能指针, 记得手动删除之
-            continue;
-        }
-
-        // 遍历到未到期的定时器,结束
-        if (now < timer->getExpiration()) {
+        // traversed an unexpired timer, stop
+        if (timer->expire > now) {
             break;
         }
 
-        // 已经过期的就收集起来
-        expiredTimers.push_back(timer);
-        timers_.pop();
+        waiting_timers.pop();
+        timers_map.erase(timer->tid);
+        expired_timers.emplace_back(timer);
     }
-    return expiredTimers; // NRVO
+
+    return expired_timers;
 }
 
-Date TimerQueue::getNearestTimerExpiration() {
-    assert(!timers_.empty());
-    return timers_.top()->getExpiration();
+void TimerWorker::OnTimeout(const DateTime& time) {
+    // drop the data to prevent busy-loop
+    uint64_t n;
+    read(timer_channel->GetFd(), &n, sizeof(n));
+
+    auto expired_timers = PopExpiredTimers();
+
+    // update time of next timeout
+    utils::SetTimerFd(timer_channel->GetFd(), GetNextTimeout());
+
+    // handle expired timers
+    for (auto* timer : expired_timers) {
+        HandleTimer(timer);
+    }
 }
 
-TimerQueue::~TimerQueue() {
-    timerFdChannel_.disableAllEvent();
-    loop_->removeChannel(&timerFdChannel_);
+void TimerWorker::HandleTimer(TimerWorker::TimerStruct* timer) {
+    // task canceled
+    if (timer->canceled) {
+        std::lock_guard<std::mutex> lock(mtx);
+        timers_map.erase(timer->tid);
+        delete timer;
+        return;
+    }
+
+    // task stop
+    if (timer->stop_condition && timer->stop_condition()) {
+        std::lock_guard<std::mutex> lock(mtx);
+        timers_map.erase(timer->tid);
+        delete timer;
+        return;
+    }
+
+    // execute task
+    timer->task();
+
+    // if task repeatable
+    if (timer->repeat_times > 0) {
+        // update and reuse this timer
+        timer->repeat_times--;
+        timer->expire = DateTime::Now().AfterMicroSeconds(timer->repeat_interval);
+        AddTimer(timer);
+        return;
+    }
+
+    // single task or repeat_timers == 0
+    delete timer;
 }
 
-TimerId TimerQueue::addTimer(Date when, Timer::Callback &&callback) {
-    assert(Date::now() < when);  // 定时的任务应该是将来的事件
-    auto newTimer = new Timer(when, std::move(callback));
-    loop_->runInLoop([this, newTimer]() { this->addTimerInLoop(newTimer); });
-    return newTimer->getTimerId();
+TimerWorker::TimerId TimerWorker::AddTimer(TimerWorker::TimerStruct* timer) {
+    if (timer->expire <= DateTime::Now()) {
+        return -1;
+    }
+
+    std::lock_guard<std::mutex> lock(mtx);
+    // update the wakeup time of timer_fd to the earliest triggered timer
+    if (waiting_timers.empty() || timer->expire < waiting_timers.top()->expire) {
+        int64_t next_timeout = timer->expire - DateTime::Now();
+        utils::SetTimerFd(timer_channel->GetFd(), next_timeout);
+    }
+
+    // id is invalid
+    if (timer->tid == -1) {
+        timer->tid = next_timer_id.fetch_add(1);
+    }
+
+    waiting_timers.emplace(timer);
+    timers_map.emplace(timer->tid, timer);
+    return timer->tid;
 }
 
-TimerId TimerQueue::addTimer(double interval, int repeatTimes, Timer::Callback &&callback) {
-    auto newTimer = new Timer(interval, repeatTimes, std::move(callback));
-    loop_->runInLoop([this, newTimer]() { this->addTimerInLoop(newTimer); });
-    return newTimer->getTimerId();
+TimerWorker::TimerId TimerWorker::AddTimer(const DateTime& when, TimerWorker::Task&& task) {
+    auto* timer = new TimerStruct();
+    timer->expire = when;
+    timer->repeat_times = 0;
+    timer->stop_condition = nullptr;
+    timer->task = std::move(task);
+
+    return AddTimer(timer);
 }
 
-TimerId TimerQueue::addTimer(double interval, Timer::Callback &&callback, Timer::StopCondition &&stopCondition) {
-    auto newTimer = new Timer(interval, std::move(callback), std::move(stopCondition));
-    loop_->runInLoop([this, newTimer]() { this->addTimerInLoop(newTimer); });
-    return newTimer->getTimerId();
+TimerWorker::TimerId TimerWorker::AddTimer(int64_t interval,
+                                           size_t repeat_times,
+                                           TimerWorker::Task&& task) {
+    auto* timer = new TimerStruct();
+    timer->expire = DateTime::Now().AfterMicroSeconds(interval);
+    timer->repeat_times = repeat_times;
+    timer->repeat_interval = interval;
+    timer->stop_condition = nullptr;
+    timer->task = std::move(task);
+
+    return AddTimer(timer);
+}
+
+TimerWorker::TimerId TimerWorker::AddTimer(int64_t interval,
+                                           TimerWorker::StopCondition&& until,
+                                           TimerWorker::Task&& task) {
+    auto* timer = new TimerStruct();
+    timer->expire = DateTime::Now().AfterMicroSeconds(interval);
+    timer->repeat_times = 0;
+    timer->repeat_interval = interval;
+    timer->stop_condition = nullptr;
+    timer->task = std::move(task);
+    timer->stop_condition = std::move(until);
+
+    return AddTimer(timer);
+}
+
+bool TimerWorker::CancelTimer(TimerWorker::TimerId tid) {
+    std::lock_guard<std::mutex> lock(mtx);
+    auto target = timers_map.find(tid);
+    if (target == std::end(timers_map)) {
+        return false;
+    }
+    target->second->canceled = true;
+    return true;
+}
+
+size_t TimerWorker::GetTotalTimers() const {
+    std::lock_guard<std::mutex> lock(mtx);
+    return waiting_timers.size();
 }
 
 
-
-
+}  // namespace jerry::net
