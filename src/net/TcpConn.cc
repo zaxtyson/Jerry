@@ -206,8 +206,8 @@ TimerQueue* TcpConn::GetTimerQueue() const {
     return GetIOWorker()->GetTimerQueue();
 }
 
-void TcpConn::SetDecoder(const std::any& decoder) {
-    this->decoder = decoder;
+void TcpConn::SetStreamCodec(const std::any& codec) {
+    this->codec = codec;
 }
 
 std::shared_ptr<TcpConn> TcpConn::GetSharedPtr() {

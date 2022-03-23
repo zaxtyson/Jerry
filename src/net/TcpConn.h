@@ -116,12 +116,12 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
     const InetAddress& GetPeerAddress() const;
 
     /**
-     * Get the decoder bind with this TcpConn
-     * @return the decoder object
+     * Get the codec bind with this TcpConn
+     * @return the codec object
      */
     template <typename Ret>
     Ret GetDecoder() const {
-        return std::any_cast<Ret>(decoder);
+        return std::any_cast<Ret>(codec);
     }
 
     /**
@@ -163,10 +163,10 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
     void SetCallback(const TcpCallback& callback);
 
     /**
-     * Set a decoder for this TcpConn to decode the byte stream
-     * @param decoder the decoder (
+     * Set a codec for this TcpConn to decode the byte stream
+     * @param codec the codec(it's better to use a shared_ptr)
      */
-    void SetDecoder(const std::any& decoder);
+    void SetStreamCodec(const std::any& codec);
 
   public:
     /**
@@ -204,7 +204,7 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
     BaseBuffer send_buffer{1024};
     BaseBuffer recv_buffer{1024};
     TcpContext context{};
-    std::any decoder;
+    std::any codec;
     std::atomic<TcpState> state{TcpState::kConnected};
     TcpCallback callback{};
 };

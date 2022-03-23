@@ -16,7 +16,7 @@ InetAddress::InetAddress(std::string_view ip, uint16_t port, bool is_ipv6) {
         [[maybe_unused]] int rc = inet_pton(AF_INET, ip.data(), &addr_v4.sin_addr);
         assert(rc > 0);
     }
-    // TODO: supported ip_v6
+    // TODO: Supported ip_v6
 }
 
 uint16_t InetAddress::GetPort() const {

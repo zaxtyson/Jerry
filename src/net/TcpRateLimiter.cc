@@ -11,7 +11,7 @@ namespace jerry::net {
 TcpRateLimiter::TcpRateLimiter(const TcpRateLimiterConfig& config) : config{config} {}
 
 bool TcpRateLimiter::ReachConnectionLimits(TcpConn* conn) {
-    // TODO: implement
+    // TODO: Implement tcp rate limiter
     return conn->GetIOWorker()->GetConnNums() >= config.max_conns_per_io_worker;
 }
 

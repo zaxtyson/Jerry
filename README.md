@@ -7,7 +7,7 @@
 
 - ✨ Jerry 是一个高性能的 C++ 网络库
 - 😎 内置定时器、线程池、异步日志等组件, 方便使用
-- 🛠 支持编写 Encoder/Decoder 处理自定义协议
+- 🛠 支持 HTTP/Websocket, 可编写 Codec 处理自定义协议
 - ♻ 基于 Reactor 模型, 使用 Epoll 驱动事件循环
 - ⚡ 使用 Kernel 3.9+ 提供的 `REUSEPORT` 特性实现高效的负载均衡
 - ❤️ 使用 Modern C++ 开发, 对人类友好
@@ -15,7 +15,7 @@
 ## 编译
 
 ```
-git clone -b refactor --recurse-submodules --shallow-submodules https://github.com/zaxtyson/Jerry.git
+git clone --recurse-submodules --shallow-submodules https://github.com/zaxtyson/Jerry.git
 ```
 
 ```
@@ -31,10 +31,11 @@ make
 
 - [EchoServer](examples/EchoServer.cc)
 - [HttpServer](examples/DemoHttpServer.cc)
+- [TimerServer](examples/TimerServer.cc)
+- [WebsocketServer](examples/DemoWebsocketServer.cc)
 
 ## TODO
 
 - [ ] TLS 支持
-- [ ] WebSocket 支持
 - [ ] MySQL 连接池
 - [ ] 协程支持

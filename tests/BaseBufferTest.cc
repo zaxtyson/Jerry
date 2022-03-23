@@ -3,11 +3,11 @@
 //
 
 #include <fcntl.h>
+#include <net/BaseBuffer.h>
 #include <unistd.h>
 #include <algorithm>
 #include <catch2/catch.hpp>
 #include <iostream>
-#include <net/BaseBuffer.h>
 
 using std::cout;
 using std::endl;
@@ -81,6 +81,24 @@ SCENARIO("BaseBuffer Test") {
             buffer.Append("abc");
             REQUIRE(buffer.ReadableBytes() == 1024 + 65535 - 10 + 3);
             REQUIRE(buffer.WritableBytes() == 7);
+
+            close(fd);
+        }
+
+        WHEN("Read more data from fd") {
+            int fd = open("/dev/zero", O_RDONLY);
+            REQUIRE(fd > 0);
+
+            REQUIRE(buffer.ReadableBytes() == 0);
+            REQUIRE(buffer.WritableBytes() == 1024);
+
+            auto n = buffer.ReadBytesFromFd(fd);
+            REQUIRE(n == 1024 + 65535);  // buffer + extra_buffer
+
+            buffer.Append("Hello");
+
+            REQUIRE(buffer.ReadableBytes() == 1024 + 65535 + 5);
+            REQUIRE(buffer.WritableBytes() > 0);
 
             close(fd);
         }

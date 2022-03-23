@@ -96,12 +96,16 @@ void BaseBuffer::EnsureWritableSpace(size_t len) {
 
     // not enough space, do realloc
     auto write_idx_back = std::distance(std::begin(buffer), write_idx);
-    buffer.resize(buffer.size() + len);
+    size_t new_size = std::max(buffer.size() + len, static_cast<size_t>(buffer.size() * 1.5));
+    buffer.resize(new_size);
     read_idx = std::begin(buffer) + free_space;
     write_idx = std::begin(buffer) + write_idx_back;
 }
 
 void BaseBuffer::Append(const BaseBuffer::value_type* data, size_t len) {
+    if (len == 0) {
+        return;
+    }
     EnsureWritableSpace(len);
     std::copy(data, data + len, BeginOfWritable());
     write_idx += len;

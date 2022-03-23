@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 class HttpReqDecoder;
 
@@ -42,6 +42,8 @@ class HttpReq {
 
   private:
     friend class HttpReqDecoder;
+
+  private:
     Body body{};
     std::string request_uri{};
     Headers headers{};
@@ -54,5 +56,5 @@ class HttpReq {
     static const std::map<HttpVersion, std::string> version_map;
 };
 
-}  // namespace jerry::http
+}  // namespace jerry::proto::http
 #endif  // JERRY_HTTPREQ_H

@@ -4,15 +4,14 @@
 
 #include "HttpServer.h"
 #include "HttpReqDecoder.h"
-#include "net/TimerQueue.h"
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 void HttpServer::OnTcpConnected(net::TcpConn* conn, const DateTime& time) {
-    // set decoder to parse http request
+    // set codec to parse http request
     auto decoder = std::make_shared<HttpReqDecoder>(conn->GetRecvBuffer());
     decoder->SetBodyMaxBytes(4 * 1024 * 1024);  // 4MB
-    conn->SetDecoder(decoder);
+    conn->SetStreamCodec(decoder);
     OnConnected(conn, time);
 }
 
@@ -41,4 +40,4 @@ void HttpServer::OnConnected([[maybe_unused]] net::TcpConn* conn,
 void HttpServer::OnDisConnected([[maybe_unused]] net::TcpConn* conn,
                                 [[maybe_unused]] const DateTime& time) {}
 
-}  // namespace jerry::http
+}  // namespace jerry::proto::http

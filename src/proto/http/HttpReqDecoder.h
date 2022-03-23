@@ -9,7 +9,7 @@
 #include "HttpReq.h"
 #include "net/BaseBuffer.h"
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 class HttpReqDecoder {
   public:
@@ -22,7 +22,7 @@ class HttpReqDecoder {
   private:
     bool ParseRequestLine();
     bool ParseHeaders();
-    bool ParseBody();
+    void ParseBody();
 
 
   private:
@@ -39,6 +39,6 @@ class HttpReqDecoder {
     static const std::map<std::string, HttpReq::HttpVersion> version_map;
 };
 
-}  // namespace jerry::http
+}  // namespace jerry::proto::http
 
 #endif  // JERRY_HTTPREQDECODER_H

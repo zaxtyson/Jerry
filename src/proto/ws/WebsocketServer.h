@@ -1,24 +1,24 @@
 //
-// Created by zaxtyson on 2022/3/18.
+// Created by zaxtyson on 2022/3/22.
 //
 
-#ifndef JERRY_HTTPSERVER_H
-#define JERRY_HTTPSERVER_H
+#ifndef JERRY_WEBSOCKETSERVER_H
+#define JERRY_WEBSOCKETSERVER_H
 
-#include "HttpReq.h"
-#include "HttpResp.h"
+#include "WsReq.h"
+#include "WsResp.h"
 #include "net/TcpServer.h"
 
-namespace jerry::http {
+namespace jerry::proto::ws {
 
-class HttpServer : public net::TcpServer {
+class WebsocketServer : public net::TcpServer {
   public:
-    HttpServer() = default;
-    ~HttpServer() override = default;
+    WebsocketServer() = default;
+    ~WebsocketServer() override = default;
 
     virtual void OnConnected(net::TcpConn* conn, const DateTime& time);
-    virtual void OnRequest(const HttpReq& req,
-                           HttpResp& resp,
+    virtual void OnRequest(const WsReq& req,
+                           WsResp& resp,
                            net::TcpConn* conn,
                            const DateTime& time);
     virtual void OnDisConnected(net::TcpConn* conn, const DateTime& time);
@@ -28,7 +28,6 @@ class HttpServer : public net::TcpServer {
     void OnTcpDisconnected(net::TcpConn* conn, const DateTime& time) override;
     void OnTcpReceivedData(net::TcpConn* conn, const DateTime& time) override;
 };
-}  // namespace jerry::http
+}  // namespace jerry::proto::ws
 
-
-#endif  // JERRY_HTTPSERVER_H
+#endif  // JERRY_WEBSOCKETSERVER_H

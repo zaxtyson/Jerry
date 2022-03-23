@@ -5,7 +5,7 @@
 #include "HttpResp.h"
 #include "utils/DateTime.h"
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 constexpr const char* CRLF = "\r\n";
 
@@ -141,18 +141,19 @@ std::string HttpResp::ToString() const {
     ret.append(CRLF);
 
     // headers
+    // whitespace before the value is ignored
     for (auto& [name, value] : headers) {
         ret.append(name);
-        ret.append(":");
+        ret.append(": ");  // or ":"
         ret.append(value);
         ret.append(CRLF);
     }
     // https://datatracker.ietf.org/doc/html/rfc2616#section-14.13
-    ret.append("Content-Length:");
+    ret.append("Content-Length: ");
     ret.append(std::to_string(GetContentLength()));
     ret.append(CRLF);
     // https://datatracker.ietf.org/doc/html/rfc2616#section-14.18
-    ret.append("Date:");
+    ret.append("Date: ");
     ret.append(utils::DateTime::Now().ToGmtString());
     ret.append(CRLF);
 
@@ -165,4 +166,4 @@ std::string HttpResp::ToString() const {
     return ret;
 }
 
-}  // namespace jerry::http
+}  // namespace jerry::proto::http

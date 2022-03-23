@@ -6,6 +6,7 @@
 #include <csignal>
 #include "Channel.h"
 #include "logger/Logger.h"
+#include "net/TimerQueue.h"  // for user convenience
 
 namespace jerry::net {
 
@@ -101,7 +102,7 @@ void TcpServer::SetTcpRateLimiter(TcpRateLimiter* limiter) {
 }
 
 void TcpServer::Monitor() {
-    // TODO: Monitor the load of each component and achieve dynamic configuration adjustment
+    // TODO: Monitor the load of each component and do dynamic configuration adjustment
     std::this_thread::sleep_for(std::chrono::seconds(5));
     LOG_DEBUG("[Health Check] Total connections: %zu, Total timers: %zu, Pending tasks: %zu",
               GetTotalConns(),

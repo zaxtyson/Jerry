@@ -30,7 +30,7 @@ Poller::Poller() {
     ChannelCallback wakeup_callback;
     wakeup_callback.OnReadable = [wakeup_fd](const DateTime&) {
         uint64_t value;  // fetch the data to avoid busy-loop
-        read(wakeup_fd, &value, sizeof(value));
+        [[maybe_unused]] int n = read(wakeup_fd, &value, sizeof(value));
     };
     wakeup_channel = new Channel(wakeup_fd);
     wakeup_channel->SetCallback(std::move(wakeup_callback));
@@ -106,7 +106,7 @@ jerry::DateTime Poller::Poll(Poller::ChannelList& active_channels) {
 
 void Poller::Wakeup() {
     uint64_t value = 1;  // counter + 1
-    write(wakeup_channel->GetFd(), &value, sizeof(value));
+    [[maybe_unused]] int n = write(wakeup_channel->GetFd(), &value, sizeof(value));
 }
 
 }  // namespace jerry::net

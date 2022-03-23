@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.0)
 project(Jerry)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wpedantic -fsanitize=address -fsanitize=undefined")
-set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -Wall -Wextra -Wpedantic -DNDEBUG")
+set(COMMON_CXX_FLAGS "-g -Wall -Wextra -Wpedantic -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS_DEBUG "${COMMON_CXX_FLAGS} -O0 -fsanitize=address -fsanitize=undefined")
+set(CMAKE_CXX_FLAGS_RELEASE "${COMMON_CXX_FLAGS} -O3 -DNDEBUG")
 
 set(EXECUTABLE_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/dist")
 set(LIBRARY_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/dist")
@@ -26,6 +27,7 @@ message(STATUS "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 set(JERRY_LIB jerry)
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/3rdparty)
 include_directories(${PROJECT_SOURCE_DIR}/3rdparty/Catch2/single_include)
 
 if (SHOW_LOG)
@@ -38,7 +40,10 @@ if (BUILD_SHARED_LIB)
     aux_source_directory(src/utils SRC_LIST)
     aux_source_directory(src/logger SRC_LIST)
     aux_source_directory(src/net SRC_LIST)
-    aux_source_directory(src/http SRC_LIST)
+    aux_source_directory(src/proto/http SRC_LIST)
+    aux_source_directory(src/proto/ws SRC_LIST)
+    aux_source_directory(3rdparty/crypto SRC_LIST)
+
     add_library(${JERRY_LIB} SHARED ${SRC_LIST})
     set_target_properties(
             ${JERRY_LIB} PROPERTIES

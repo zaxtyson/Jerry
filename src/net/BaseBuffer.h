@@ -55,7 +55,8 @@ class BaseBuffer {
     void EnsureWritableSpace(size_t len);
 
   private:
-    std::vector<value_type> buffer;
+    //std::vector<value_type> header{};  // proto header if needed
+    std::vector<value_type> buffer;    // payload data
     iterator read_idx{std::begin(buffer)};
     iterator write_idx{std::begin(buffer)};
 };

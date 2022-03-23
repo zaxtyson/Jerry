@@ -4,7 +4,7 @@
 
 #include "HttpReq.h"
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 const std::map<HttpReq::Method, std::string> HttpReq::method_map = {
     {HttpReq::Method::GET, "GET"},

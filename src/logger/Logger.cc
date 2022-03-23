@@ -33,7 +33,7 @@ void FormatNowString(char* buffer) {
         gmtime_r(&tv.tv_sec, &tm_time);
         snprintf(prefixOfTime,
                  sizeof(prefixOfTime),
-                 "%4d-%02d-%02d %02d:%02d:%02d.",  // len = 20
+                 "%4u-%02u-%02u %02u:%02u:%02u.",  // len = 20
                  tm_time.tm_year + 1900,
                  tm_time.tm_mon + 1,
                  tm_time.tm_mday,
@@ -42,7 +42,7 @@ void FormatNowString(char* buffer) {
                  tm_time.tm_sec);
     }
     // "2021-00-00 00:00:00.000000" len = 26
-    snprintf(buffer, 27, "%s%06ld", prefixOfTime, tv.tv_usec / 1000);
+    snprintf(buffer, 27, "%s%06u", prefixOfTime, (uint32_t)(tv.tv_usec / 1000));
     // buffer = "2021-00-00 00:00:00.000000" "\0" "other str"
     buffer[26] = ' ';  // remove '\0'
 }

@@ -2,20 +2,21 @@
 // Created by zaxtyson on 2021/9/25.
 //
 
-#include <http/HttpServer.h>
 #include <logger/Logger.h>
+#include <proto/http/HttpServer.h>
 
 using namespace jerry;
+using namespace jerry::proto::http;
 using namespace std::chrono_literals;
 
-class DemoHttpServer : public http::HttpServer {
+class DemoHttpServer : public HttpServer {
     void OnConnected(net::TcpConn* conn, const DateTime& time) override {
         LOG_INFO(
             "%s connected at %s", conn->GetPeerAddress().GetHost().data(), time.ToString().data())
     }
 
-    void OnRequest(const http::HttpReq& req,
-                   http::HttpResp& resp,
+    void OnRequest(const HttpReq& req,
+                   HttpResp& resp,
                    net::TcpConn* conn,
                    const DateTime& time) override {
         LOG_INFO("%s | %s %s %s | %s | body %zu bytes",

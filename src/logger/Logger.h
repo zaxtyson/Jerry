@@ -41,6 +41,7 @@ const char* GetLogLevelString(LogLevel level);
 #ifndef SHOW_LOG
 #define LOG_BASE(level, fmt, ...) ((void)0);
 #else
+// TODO: Implement an extensibility logger instead of extreme performance
 #define LOG_BASE(level, fmt, ...)                                   \
     if (level >= Logger::GetLogLevel()) {                           \
         char buf[1024];                                             \

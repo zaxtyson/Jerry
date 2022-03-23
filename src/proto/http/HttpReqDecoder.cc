@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cassert>
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 constexpr auto CRLF = "\r\n";
 
@@ -102,7 +102,6 @@ bool HttpReqDecoder::ParseRequestLine() {
     return true;
 }
 
-
 bool HttpReqDecoder::ParseHeaders() {
     // name1: value1\r\n
     // name2: value2\r\n
@@ -124,7 +123,7 @@ bool HttpReqDecoder::ParseHeaders() {
             return false;
         }
         std::string name{buffer.BeginOfReadable(), colon};
-        // whitespace before the value is ignored.
+        // whitespace before the value is ignored
         auto value_pos = (*(colon + 1) == ' ') ? colon + 2 : colon + 1;
         std::string value{value_pos, crlf};
         req.headers.emplace(std::move(name), std::move(value));
@@ -137,7 +136,7 @@ bool HttpReqDecoder::ParseHeaders() {
     return true;
 }
 
-bool HttpReqDecoder::ParseBody() {
+void HttpReqDecoder::ParseBody() {
     auto max_size = std::min(buffer.ReadableBytes(), body_max_bytes);
     if (max_size > body_max_bytes) {
         req.is_body_truncated = true;  // mark it as true
@@ -145,7 +144,6 @@ bool HttpReqDecoder::ParseBody() {
     req.body = {buffer.BeginOfReadable(), buffer.BeginOfReadable() + max_size};
     state = State::kParseFinished;
     buffer.DropAllBytes();
-    return true;
 }
 
-}  // namespace jerry::http
+}  // namespace jerry::proto::http

@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-namespace jerry::http {
+namespace jerry::proto::http {
 
 class HttpResp {
   public:
