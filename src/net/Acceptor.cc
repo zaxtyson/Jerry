@@ -63,13 +63,13 @@ void Acceptor::OnPeerConnect(const DateTime& time) {
             close(reserved_fd);
             reserved_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
         }
-        LOG_WARN("Accept new client failed: %s", strerror(errno));
+        LOG_WARN("Accept new client failed: %s", strerror(errno))
         return;
     }
 
     // create TcpConn for new client, bind with user specify tcp_callback
-    // default state is `TcpState::kConnected`
-    LOG_DEBUG("New client connected: %s, fd = %d", peer_addr.GetHost().c_str(), client_fd);
+    // default state is `State::kConnected`
+    LOG_DEBUG("New client connected: %s, fd = %d", peer_addr.GetHost().c_str(), client_fd)
     auto* conn = new TcpConn(client_fd, acceptor->GetLocalAddr(), peer_addr);
     conn->SetIOWorker(worker);        // bind TcpConn with IOWorker
     conn->SetCallback(tcp_callback);  // set tcp callback
@@ -85,6 +85,9 @@ void Acceptor::OnPeerConnect(const DateTime& time) {
     if (tcp_callback.OnConnected) {
         tcp_callback.OnConnected(conn, time);
     }
+
+    // try creating SSL on this connection
+    conn->InitSsl();
 }
 
 }  // namespace jerry::net

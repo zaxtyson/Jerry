@@ -12,6 +12,21 @@ namespace jerry::net {
 
 void TcpServer::Config(const ServerConfig& config) {
     this->config = config;
+
+    if (config.ssl.use_ssl) {
+        ssl_ctx = new SslContext();
+        if (config.ssl.disable_old_ssl_version) {
+            ssl_ctx->DisableOldVersion();
+        }
+        if (config.ssl.enable_validation) {
+            ssl_ctx->EnableValidation();
+        }
+        ssl_ctx->SetCertPath(config.ssl.cert_file, config.ssl.private_key_file);
+    }
+}
+
+TcpServer::~TcpServer() {
+    delete ssl_ctx;
 }
 
 size_t TcpServer::GetTotalConns() const {
@@ -48,9 +63,11 @@ void TcpServer::Serve() {
     };
 
     // Start all components
-    worker_group.Start(
-        config.event_loop_size, InetAddress(config.listen_ip, config.listen_port), callback);
-    thread_pool.Start(config.thread_pool_size, config.thread_pool_pending);
+    worker_group.Start(config.workgroup.workers,
+                       InetAddress(config.acceptor.listen_ip, config.acceptor.listen_port),
+                       callback,
+                       ssl_ctx);
+    thread_pool.Start(config.threadpool.workers, config.threadpool.pending_size);
 
     // handle signals
     struct sigaction action {};

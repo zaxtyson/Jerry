@@ -43,11 +43,17 @@ int main() {
     Logger::SetLogLevel(LogLevel::kDebug);
 
     net::ServerConfig config;
-    config.listen_ip = "127.0.0.1";
-    config.listen_port = 8080;
-    config.event_loop_size = 1;
-    config.thread_pool_size = 1;
-    config.thread_pool_pending = 0;
+    config.acceptor.listen_ip = "127.0.0.1";
+    config.acceptor.listen_port = 8080;
+    config.workgroup.workers = 1;
+    config.threadpool.workers = 1;
+    config.threadpool.pending_size = 0;
+    // ssl config
+    config.ssl.use_ssl = true;
+    config.ssl.disable_old_ssl_version = true;
+    config.ssl.enable_validation = true;
+    config.ssl.cert_file = "./pem/cert.pem";
+    config.ssl.private_key_file = "./pem/key.pem";
 
     DemoWebsocketServer server;
     server.Config(config);

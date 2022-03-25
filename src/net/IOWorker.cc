@@ -95,4 +95,12 @@ TimerQueue* IOWorker::GetTimerQueue() {
     return timer_queue;
 }
 
+SslContext* IOWorker::GetSslContext() const {
+    return ssl_ctx;
+}
+
+void IOWorker::SetSslContext(SslContext* context) {
+    this->ssl_ctx = context;
+}
+
 }  // namespace jerry::net

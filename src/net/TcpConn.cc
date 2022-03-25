@@ -7,6 +7,7 @@
 #include <cstring>
 #include "Channel.h"
 #include "IOWorker.h"
+#include "SslContext.h"
 #include "TimerQueue.h"
 #include "logger/Logger.h"
 
@@ -18,6 +19,9 @@ TcpConn::TcpConn(int fd, const InetAddress& local_addr, const InetAddress& peer_
 TcpConn::~TcpConn() {
     LOG_DEBUG("TcpConn destroy, peer addr: %s", peer_addr.GetHost().data())
     delete channel;
+    if (IsEncrypted()) {
+        SSL_free(ssl);
+    }
 }
 
 Channel* TcpConn::GetChannel() const {
@@ -33,7 +37,7 @@ void TcpConn::SetIOWorker(IOWorker* worker) {
     this->channel->SetPoller(worker->GetPoller());
 }
 
-TcpState TcpConn::ExchangeState(TcpState state) {
+TcpConn::State TcpConn::ExchangeState(State state) {
     return this->state.exchange(state);
 }
 
@@ -48,89 +52,22 @@ void TcpConn::RemoveFromIOWorker() {
 void TcpConn::SetCallback(const TcpCallback& callback) {
     this->callback = callback;
 
-    // set callback for channel
-    ChannelCallback channel_callback;
-
     // the lifecycle of TcpConn is always longer than its channel
     // thus, we don't bind a shared_ptr in callback
-    channel_callback.OnReadable = [conn = this](const DateTime& time) {
-        if (!conn->IsConnected()) {
-            return;  // this connection has been closed
-        }
-
-        ssize_t n = conn->recv_buffer.ReadBytesFromFd(conn->GetChannel()->GetFd());
-        if (n <= 0) {  // peer disconnected when we read, force close it
-            conn->ForceClose();
-            return;
-        }
-
-        // everything ok
-        if (conn->callback.OnDataReceived) {
-            conn->callback.OnDataReceived(conn, time);
-        }
-    };
-
-    // on channel writable, send the data in send_buffer
-    channel_callback.OnWritable = [conn = this]([[maybe_unused]] const DateTime& time) {
-        if (!conn->IsConnected()) {
-            LOG_DEBUG("Channel fd = %d is not writeable for tcp connection is shutdown/closed",
-                      conn->GetChannel()->GetFd())
-            return;
-        }
-
-        int fd = conn->channel->GetFd();
-        ssize_t n = conn->send_buffer.WriteBytesToFd(fd);
-
-        if (n < 0) {
-            LOG_ERROR("Write data to fd %d error, %s, peer addr: %s",
-                      fd,
-                      strerror(errno),
-                      conn->peer_addr.GetHost().c_str())
-            if (errno == EPIPE || errno == ECONNRESET) {  // peer disconnected
-                if (conn->callback.OnDisconnected) {
-                    conn->callback.OnDisconnected(conn, DateTime::Now());
-                }
-                return;
-            }
-        }
-
-        conn->send_buffer.DropBytes(n);  // drop the data already sent
-        LOG_DEBUG("Write %zu bytes to fd = %d, remains %zu bytes",
-                  n,
-                  fd,
-                  conn->send_buffer.ReadableBytes())
-
-        // if no data to send, deactivate writing to prevent busy-loop(LT mode)
-        if (conn->send_buffer.ReadableBytes() == 0) {
-            conn->channel->DeactivateWriting();
-        }
-    };
-
-    channel_callback.OnPeerClose = [conn = this](const DateTime& time) {
-        conn->ExchangeState(TcpState::kDisconnected);
-        conn->channel->RemoveFromPoller();
-
-        // TcpConn object may be destroyed in an uncertain future, so we release the buffer
-        // immediately after peer closed to prevent the garbage data from surviving too long
-        conn->send_buffer.Release();
-        conn->recv_buffer.Release();
-
-        if (conn->callback.OnDisconnected) {
-            conn->callback.OnDisconnected(conn, time);
-        }
-        // when the last shared_ptr of this TcpConn be removed, this TcpConn will be destroyed
-        // maybe someone else owns the copy of shared_ptr(such as timer task)
-        conn->RemoveFromIOWorker();
-    };
-
-    // if an error occurs, just close the connection
+    ChannelCallback channel_callback;
+    channel_callback.OnReadable = [this](const DateTime& time) { this->OnChannelReadable(time); };
+    channel_callback.OnWritable = [this](const DateTime& time) { this->OnChannelWritable(time); };
+    channel_callback.OnPeerClose = [this](const DateTime& time) { this->OnChannelClose(time); };
     channel_callback.OnError = channel_callback.OnPeerClose;
-
     channel->SetCallback(std::move(channel_callback));
 }
 
 bool TcpConn::IsConnected() const {
-    return state.load() == TcpState::kConnected;
+    return state.load() == State::kConnected;
+}
+
+bool TcpConn::IsEncrypted() const {
+    return worker->GetSslContext() != nullptr;
 }
 
 void TcpConn::Send(std::string_view data) {
@@ -157,7 +94,7 @@ void TcpConn::Send(BaseBuffer::const_iterator begin, BaseBuffer::const_iterator 
 
 void TcpConn::Shutdown() {
     // forbid user call `Send` after shutdown
-    ExchangeState(TcpState::kShutdown);
+    ExchangeState(State::kShutdown);
 
     // no longer interest in writing events, no data will be writen to kernel buffer
     channel->DeactivateWriting();
@@ -213,6 +150,134 @@ void TcpConn::SetStreamCodec(const std::any& codec) {
 std::shared_ptr<TcpConn> TcpConn::GetSharedPtr() {
     return shared_from_this();
 }
+
+void TcpConn::InitSsl() {
+    if (IsEncrypted()) {
+#ifdef USE_OPENSSL
+        ssl = SSL_new(worker->GetSslContext()->Get());
+        [[maybe_unused]] int rc = SSL_set_fd(ssl, GetChannel()->GetFd());
+        assert(rc == 1);
+
+        // for transparent negotiation
+        SSL_set_accept_state(ssl);
+        LOG_INFO("TcpConn [%s] is encrypted by OpenSSL", peer_addr.GetHost().data())
+#else
+        LOG_WARN("Your system has not installed openssl!")
+#endif
+    }
+}
+
+void TcpConn::OnChannelReadable(const DateTime& time) {
+    // we can call `SSL_do_handshake(ssl)` here to do handshake manually
+    // State::kExceptHandshake => SSL_do_handshake => State::kConnected
+
+    if (!IsConnected()) {
+        LOG_DEBUG("Channel fd = %d is not readable for tcp connection is shutdown/closed",
+                  GetChannel()->GetFd())
+        return;  // this connection has been closed
+    }
+
+    if (IsEncrypted()) {
+#ifndef USE_OPENSSL
+        LOG_FATAL("Your system has not installed openssl!")
+#else
+        ssize_t n = recv_buffer.ReadBytesFromSsl(ssl);
+        if (n == 0) {
+            Shutdown();
+            return;
+        }
+        if (n < 0) {
+            int rc = SSL_get_error(ssl, static_cast<int>(n));
+            if (rc == SSL_ERROR_WANT_READ) {
+                return;  // wait next time
+            } else {
+                char err_msg[4096];
+                ERR_error_string_n(ERR_get_error(), err_msg, sizeof(err_msg));
+                LOG_WARN("SSL read error: %u, %s", rc, err_msg)
+                ForceClose();
+                return;
+            }
+        }
+#endif
+    } else {
+        ssize_t n = recv_buffer.ReadBytesFromFd(GetChannel()->GetFd());
+        if (n <= 0) {  // peer disconnected when we read, force close it
+            ForceClose();
+            return;
+        }
+    }
+
+    // everything ok
+    if (callback.OnDataReceived) {
+        callback.OnDataReceived(this, time);
+    }
+}
+
+void TcpConn::OnChannelWritable(const DateTime& time) {
+    if (!IsConnected()) {
+        LOG_DEBUG("Channel fd = %d is not writeable for tcp connection is shutdown/closed",
+                  GetChannel()->GetFd())
+        return;
+    }
+
+    ssize_t n;
+    if (IsEncrypted()) {
+#ifndef USE_OPENSSL
+        LOG_FATAL("Your system has not installed openssl!")
+#else
+        n = send_buffer.WriteBytesToSsl(ssl);
+        if (n <= 0) {
+            int rc = SSL_get_error(ssl, static_cast<int>(n));
+            char err_msg[4096];
+            ERR_error_string_n(ERR_get_error(), err_msg, sizeof(err_msg));
+            LOG_WARN("SSL write error: %d, %s", rc, err_msg)
+            ForceClose();
+        }
+#endif
+    } else {
+        n = send_buffer.WriteBytesToFd(channel->GetFd());
+        if (n < 0) {
+            LOG_ERROR("Write data to fd %d error, %s, peer addr: %s",
+                      channel->GetFd(),
+                      strerror(errno),
+                      peer_addr.GetHost().c_str())
+            if (errno == EPIPE || errno == ECONNRESET) {  // peer disconnected
+                if (callback.OnDisconnected) {
+                    callback.OnDisconnected(this, DateTime::Now());
+                }
+                return;
+            }
+        }
+    }
+
+    LOG_DEBUG("Write %zu bytes to fd = %d, remains %zu bytes",
+              n,
+              channel->GetFd(),
+              send_buffer.ReadableBytes())
+
+    // if no data to send, deactivate writing to prevent busy-loop(LT mode)
+    if (send_buffer.ReadableBytes() == 0) {
+        channel->DeactivateWriting();
+    }
+}
+
+void TcpConn::OnChannelClose(const DateTime& time) {
+    ExchangeState(State::kDisconnected);
+    channel->RemoveFromPoller();
+
+    // TcpConn object may be destroyed in an uncertain future, so we release the buffer
+    // immediately after peer closed to prevent the garbage data from surviving too long
+    send_buffer.Release();
+    recv_buffer.Release();
+
+    if (callback.OnDisconnected) {
+        callback.OnDisconnected(this, time);
+    }
+    // when the last shared_ptr of this TcpConn be removed, this TcpConn will be destroyed
+    // maybe someone else owns the copy of shared_ptr(such as timer task)
+    RemoveFromIOWorker();
+}
+
 
 bool TcpConnSet::Empty() const {
     LockGuard lock(mtx);

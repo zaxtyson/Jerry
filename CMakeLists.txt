@@ -15,20 +15,26 @@ set(LIBRARY_OUTPUT_PATH "${PROJECT_SOURCE_DIR}/dist")
 
 set(CMAKE_BUILD_TYPE Release)
 set(BUILD_SHARED_LIB ON)
-set(BUILD_TESTS ON)
-set(BUILD_EXAMPLES ON)
-set(BUILD_WRK ON)
-set(SHOW_LOG ON)
+set(BUILD_TESTS OFF)    # 构建测试
+set(BUILD_EXAMPLES ON)  # 构建 examples
+set(BUILD_WRK OFF)      # 构建 wrk(压测用)
+set(SHOW_LOG ON)        # 是否允许使用日志
 
 ########################
 
-message(STATUS "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
-
 set(JERRY_LIB jerry)
+message(STATUS "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/3rdparty)
 include_directories(${PROJECT_SOURCE_DIR}/3rdparty/Catch2/single_include)
+
+########################
+
+find_package(OpenSSL)
+if (OpenSSL_FOUND)
+    add_definitions(-DUSE_OPENSSL)
+endif ()
 
 if (SHOW_LOG)
     message(STATUS "Enable logger for project")

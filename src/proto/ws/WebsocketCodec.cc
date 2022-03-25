@@ -86,7 +86,7 @@ std::string WebsocketCodec::GetSecWebSocketAccept(std::string_view sec_key) {
     std::string accept_key{sec_key};
     accept_key += RFC6544_MAGIC_KEY;
     uint8_t digest[20]{};  // 160 bit sha1 digest
-    SHA1 sha;
+    class SHA1 sha;
     sha.Input(accept_key.data(), accept_key.size());
     sha.Result((uint32_t*)digest);
     // little endian to big endian

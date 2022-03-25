@@ -13,6 +13,8 @@
 #include "Appender.h"
 #include "AsyncFileAppender.h"
 
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+
 namespace jerry::logger {
 
 enum class LogLevel : uint8_t { kDebug, kInfo, kWarn, kError, kFatal };

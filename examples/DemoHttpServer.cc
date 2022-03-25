@@ -81,11 +81,19 @@ int main() {
     Logger::SetLogLevel(LogLevel::kInfo);
 
     net::ServerConfig config;
-    config.listen_ip = "0.0.0.0";
-    config.listen_port = 8080;
-    config.event_loop_size = 4;
-    config.thread_pool_size = 4;
-    config.thread_pool_pending = 0;  // unlimited
+    config.acceptor.listen_ip = "127.0.0.1";
+    config.acceptor.listen_port = 8443;
+    config.workgroup.workers = 1;
+    config.threadpool.workers = 0;
+    config.threadpool.pending_size = 0;
+
+    // to generate certification: https://mkcert.dev/
+    // mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 ::1
+    config.ssl.use_ssl = true;
+    config.ssl.disable_old_ssl_version = true;
+    config.ssl.enable_validation = true;
+    config.ssl.cert_file = "./pem/cert.pem";
+    config.ssl.private_key_file = "./pem/key.pem";
 
     DemoHttpServer server;
     server.Config(config);

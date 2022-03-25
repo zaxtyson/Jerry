@@ -6,6 +6,10 @@
 #include <sys/uio.h>     // iovec
 #include <sys/unistd.h>  // write
 
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#endif
+
 namespace jerry::net {
 
 BaseBuffer::BaseBuffer(size_t init_size)
@@ -157,7 +161,37 @@ ssize_t BaseBuffer::ReadBytesFromFd(int fd) {
 }
 
 ssize_t BaseBuffer::WriteBytesToFd(int fd) {
-    return write(fd, BeginOfReadable().base(), ReadableBytes());
+    int n = write(fd, BeginOfReadable().base(), ReadableBytes());
+    if (n > 0) {
+        DropBytes(n);
+    }
+    return n;
+}
+
+ssize_t BaseBuffer::ReadBytesFromSsl(SSL* ssl) {
+#ifdef USE_OPENSSL
+    // https://www.openssl.org/docs/man3.0/man3/SSL_read.html
+    EnsureWritableSpace(1024);
+    int n = SSL_read(ssl, BeginOfWritable().base(), static_cast<int>(WritableBytes()));
+    if (n > 0) {
+        write_idx += n;  // read success
+    }
+    return n;
+#else
+    return -1;
+#endif
+}
+
+ssize_t BaseBuffer::WriteBytesToSsl(SSL* ssl) {
+#ifdef USE_OPENSSL
+    int n = SSL_write(ssl, BeginOfReadable().base(), static_cast<int>(ReadableBytes()));
+    if (n > 0) {
+        DropBytes(n);  // write success
+    }
+    return n;
+#else
+    return -1
+#endif
 }
 
 }  // namespace jerry::net

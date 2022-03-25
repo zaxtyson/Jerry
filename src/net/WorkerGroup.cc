@@ -10,9 +10,11 @@ namespace jerry::net {
 
 void WorkerGroup::Start(size_t workers,
                         const InetAddress& listen_addr,
-                        const TcpCallback& callback) {
+                        const TcpCallback& callback,
+                        SslContext* context) {
     for (size_t i = 0; i < workers; i++) {
         auto* worker = new IOWorker(i, listen_addr, callback);
+        worker->SetSslContext(context);  // set ssl context for each worker
         worker_set.emplace_back(worker);
         worker_threads.emplace_back([worker] { worker->Loop(); });
     }

@@ -15,6 +15,7 @@ namespace jerry::net {
 class Poller;
 class Acceptor;
 class TimerQueue;
+class SslContext;
 
 class IOWorker : NonCopyable {
   public:
@@ -47,6 +48,12 @@ class IOWorker : NonCopyable {
     TimerQueue* GetTimerQueue();
 
     /**
+     * Get the SslContext
+     * @return the SslContext
+     */
+    SslContext* GetSslContext() const;
+
+    /**
      * Get the number of TcpConns
      * @return the number of TcpConns
      */
@@ -75,11 +82,18 @@ class IOWorker : NonCopyable {
      */
     void RemoveTcpConn(const TcpConnPtr& conn);
 
+    /**
+     * Set the global SslContext
+     * @param context SslContext
+     */
+    void SetSslContext(SslContext* context);
+
   private:
     size_t tid{};  // thread id in IOWorkerGroup
     Poller* poller{};
     TimerQueue* timer_queue{};
     Acceptor* acceptor{};
+    SslContext* ssl_ctx{};   // global SSL context, `nullptr` if not enable ssl
     TcpConnSet tcp_conns{};  // store TcpConn
     std::atomic<bool> stop_loop{false};
 };

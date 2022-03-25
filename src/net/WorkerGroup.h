@@ -21,8 +21,12 @@ class WorkerGroup {
      * @param workers how many worker threads
      * @param listen_addr the addr_v4 to be listened
      * @param callback callback for new TcpConn
+     * @param context SSLContext if enabled ssl
      */
-    void Start(size_t workers, const InetAddress& listen_addr, const TcpCallback& callback);
+    void Start(size_t workers,
+               const InetAddress& listen_addr,
+               const TcpCallback& callback,
+               SslContext* context);
 
     /**
      * Stop all workers

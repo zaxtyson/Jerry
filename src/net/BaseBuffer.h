@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string_view>
 #include <vector>
+#include <openssl/ssl.h>
 
 namespace jerry::net {
 
@@ -24,6 +25,8 @@ class BaseBuffer {
 
     ssize_t ReadBytesFromFd(int fd);
     ssize_t WriteBytesToFd(int fd);
+    ssize_t ReadBytesFromSsl(SSL* ssl);
+    ssize_t WriteBytesToSsl(SSL* ssl);
 
     size_t ReadableBytes() const;
     size_t WritableBytes() const;

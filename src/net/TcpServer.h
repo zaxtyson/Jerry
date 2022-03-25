@@ -6,6 +6,7 @@
 #define JERRY_TCPSERVER_H
 
 #include "InetAddress.h"
+#include "SslContext.h"
 #include "TcpRateLimiter.h"
 #include "ThreadPool.h"
 #include "WorkerGroup.h"
@@ -14,17 +15,33 @@
 namespace jerry::net {
 
 struct ServerConfig {
-    std::string listen_ip{"0.0.0.0"};
-    uint16_t listen_port{80};
-    size_t event_loop_size{1};
-    size_t thread_pool_size{4};
-    size_t thread_pool_pending{0};
+    struct {
+        std::string listen_ip{"0.0.0.0"};
+        uint16_t listen_port{80};
+    } acceptor;
+
+    struct {
+        bool use_ssl{false};
+        bool disable_old_ssl_version{false};
+        bool enable_validation{false};
+        std::string cert_file;
+        std::string private_key_file;
+    } ssl;
+
+    struct {
+        size_t workers{4};
+    } workgroup;
+
+    struct {
+        size_t workers{4};
+        size_t pending_size{0};
+    } threadpool;
 };
 
 class TcpServer : NonCopyable {
   public:
     TcpServer() = default;
-    virtual ~TcpServer() = default;
+    virtual ~TcpServer();
 
   public:
     /**
@@ -110,6 +127,7 @@ class TcpServer : NonCopyable {
     ServerConfig config{};
     WorkerGroup worker_group{};
     ThreadPool thread_pool{};
+    SslContext* ssl_ctx{};
     TcpRateLimiter* limiter{};
 
   private:

@@ -7,16 +7,21 @@
 
 - ✨ Jerry 是一个高性能的 C++ 网络库
 - 😎 内置定时器、线程池、异步日志等组件, 方便使用
-- 🛠 支持 HTTP/Websocket, 可编写 Codec 处理自定义协议
 - ♻ 基于 Reactor 模型, 使用 Epoll 驱动事件循环
+- 🛠 支持 HTTP/Websocket, 可编写 Codec 处理自定义协议
+- 🛡 使用 OpenSSL 提供 SSL/TLS 流量加密(可选)
 - ⚡ 使用 Kernel 3.9+ 提供的 `REUSEPORT` 特性实现高效的负载均衡
 - ❤️ 使用 Modern C++ 开发, 对人类友好
 
 ## 编译
 
+本项目基于 C++17 开发, 如果编译器版本过低, 请[升级编译器工具链](docs/update-dev-tools.md)
+
 ```
 git clone --recurse-submodules --shallow-submodules https://github.com/zaxtyson/Jerry.git
 ```
+
+需要修改编译选项请查看 [CMakeLists.txt](CMakeLists.txt)
 
 ```
 mkdir build
@@ -36,6 +41,5 @@ make
 
 ## TODO
 
-- [ ] TLS 支持
-- [ ] MySQL 连接池
+- [ ] MySQL/Redis 连接池
 - [ ] 协程支持

@@ -5,6 +5,10 @@
 #ifndef JERRY_TCPCONN_H
 #define JERRY_TCPCONN_H
 
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+#endif
+
 #include <any>
 #include <atomic>
 #include <functional>
@@ -28,8 +32,6 @@ class TimerQueue;
 
 using LockGuard = std::lock_guard<std::mutex>;
 
-enum class TcpState : char { kConnected, kDisconnected, kShutdown };
-
 struct TcpCallback {
     using Type = std::function<void(TcpConn*, const DateTime&)>;
 
@@ -37,7 +39,6 @@ struct TcpCallback {
     Type OnDisconnected = nullptr;
     Type OnDataReceived = nullptr;
 };
-
 
 class TcpContext {
   public:
@@ -48,7 +49,6 @@ class TcpContext {
     mutable std::mutex mtx{};
     std::map<std::string, std::any> context{};
 };
-
 
 class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
   public:
@@ -62,6 +62,13 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
      */
     bool IsConnected() const;
 
+    /**
+     * Check if the TcpConn is encrypted by SSL
+     * @return true if encrypted
+     */
+    bool IsEncrypted() const;
+
+  public:
     /**
      * Get the channel bounded with this connection
      * @return the pointer of channel
@@ -181,7 +188,7 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
 
     /**
      * Shutdown this connection
-     * Just send a `FIN` to client and mark this connection as `TcpState::kShutdown`.
+     * Just send a `FIN` to client and mark this connection as `State::kShutdown`.
      * You can no longer send any data, but you can continue to read from client.
      * Connection will completely closed when the client disconnected.
      */
@@ -192,9 +199,24 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
      */
     void ForceClose();
 
+    /**
+     * Try creating SSL on this connection if defined micro `USE_OPENSSL` and IoWorker
+     * enabled the SSL feature
+     */
+    void InitSsl();
+
   private:
-    TcpState ExchangeState(TcpState state);
+    enum class State : uint8_t { /**kExceptHandshake,**/ kConnected, kDisconnected, kShutdown };
+
+  private:
+    State ExchangeState(State state);
     void RemoveFromIOWorker();
+
+  private:
+    // channel callback
+    void OnChannelReadable(const DateTime& time);
+    void OnChannelWritable(const DateTime& time);
+    void OnChannelClose(const DateTime& time);
 
   private:
     Channel* channel{};
@@ -205,8 +227,12 @@ class TcpConn : NonCopyable, public std::enable_shared_from_this<TcpConn> {
     BaseBuffer recv_buffer{1024};
     TcpContext context{};
     std::any codec;
-    std::atomic<TcpState> state{TcpState::kConnected};
+    std::atomic<State> state{State::kConnected};
     TcpCallback callback{};
+
+#ifdef USE_OPENSSL
+    SSL* ssl;
+#endif
 };
 
 

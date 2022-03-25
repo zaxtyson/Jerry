@@ -51,10 +51,10 @@ void Poller::AddChannel(Channel* channel) {
     epoll_event evt{};
     int ret = epoll_ctl(fd, EPOLL_CTL_ADD, c_fd, &evt);
     if (ret == -1) {
-        LOG_ERROR("Failed to add channel %d to poller %d: %s", c_fd, fd, strerror(errno))
+        LOG_ERROR("Failed to add channel %d => poller %d: %s", c_fd, fd, strerror(errno))
         return;
     }
-    LOG_DEBUG("Add channel %d to poller %d success", c_fd, fd)
+    LOG_DEBUG("Add channel %d => poller %d success", c_fd, fd)
 }
 
 void Poller::RemoveChannel(Channel* channel) {
