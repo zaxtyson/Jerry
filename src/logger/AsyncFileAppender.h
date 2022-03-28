@@ -9,12 +9,12 @@
 #include <condition_variable>
 #include <fstream>  // ofstream
 #include <memory>
-#include <mutex>
 #include <string_view>
 #include <thread>
 #include <vector>
 #include "Appender.h"
 #include "utils/CountDownLatch.h"
+#include "utils/Mutex.h"
 #include "utils/NonCopyable.h"
 
 namespace jerry::logger {
@@ -65,11 +65,11 @@ class AsyncFileAppender : public Appender {
     std::thread th{};
     utils::CountDownLatch latch{1};
     std::mutex mtx{};
-    std::condition_variable cond{};
+    std::condition_variable cond GUARDED_BY(mtx);
 
-    BufferPtr cur_buffer{new FixedBuffer()};
-    BufferPtr next_buffer{new FixedBuffer()};
-    BufferVector fulled_buffers{};
+    BufferPtr cur_buffer PT_GUARDED_BY(mtx);
+    BufferPtr next_buffer PT_GUARDED_BY(mtx);
+    BufferVector fulled_buffers GUARDED_BY(mtx);
 };
 
 }  // namespace jerry::logger

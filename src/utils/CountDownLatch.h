@@ -6,7 +6,7 @@
 #define JERRY_COUNTDOWNLATCH_H
 
 #include <condition_variable>
-#include <mutex>
+#include "Mutex.h"
 #include "NonCopyable.h"
 
 namespace jerry::utils {
@@ -21,9 +21,9 @@ class CountDownLatch : NonCopyable {
     int GetCount() const;
 
   private:
-    std::mutex mtx{};
-    std::condition_variable cond{};
-    int count;
+    mutable std::mutex mtx{};
+    std::condition_variable cond GUARDED_BY(mtx);
+    int count GUARDED_BY(mtx);
 };
 
 }  // namespace jerry::utils

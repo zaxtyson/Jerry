@@ -12,6 +12,8 @@
 #include <queue>
 #include <thread>
 #include "utils/NonCopyable.h"
+#include "utils/Mutex.h"
+
 
 namespace jerry::net {
 
@@ -60,13 +62,15 @@ class ThreadPool : NonCopyable {
         bool operator()(TaskStruct* lhs, TaskStruct* rhs) { return lhs->priority < rhs->priority; }
     };
 
+    using TaskStructQueue = std::priority_queue<TaskStruct*, std::vector<TaskStruct*>, TaskCmp>;
+
   private:
     size_t pending_size{};
     std::atomic<bool> stop{false};
     mutable std::mutex mtx{};
-    std::condition_variable condition{};
-    std::map<TaskId, TaskStruct*> tasks_map{};
-    std::priority_queue<TaskStruct*, std::vector<TaskStruct*>, TaskCmp> pending_tasks{};
+    std::condition_variable condition GUARDED_BY(mtx);
+    std::map<TaskId, TaskStruct*> tasks_map GUARDED_BY(mtx);
+    TaskStructQueue pending_tasks GUARDED_BY(mtx);
     std::vector<std::thread> worker_threads{};
 
   private:

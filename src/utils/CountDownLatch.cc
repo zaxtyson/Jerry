@@ -14,13 +14,14 @@ void CountDownLatch::Wait() {
 }
 
 void CountDownLatch::CountDown() {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     if (--count == 0) {
         cond.notify_all();
     }
 }
 
 int CountDownLatch::GetCount() const {
+    LockGuard lock(mtx);
     return count;
 }
 

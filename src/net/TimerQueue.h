@@ -9,11 +9,10 @@
 #include <chrono>
 #include <functional>
 #include <map>
-#include <mutex>
 #include <queue>
 #include "utils/DateTime.h"
 #include "utils/NonCopyable.h"
-
+#include "utils/Mutex.h"
 
 namespace jerry::net {
 
@@ -109,6 +108,8 @@ class TimerQueue : NonCopyable {
         bool operator()(TimerStruct* lhs, TimerStruct* rhs) { return lhs->expire < rhs->expire; }
     };
 
+    using TimerStructQueue = std::priority_queue<TimerStruct*, std::vector<TimerStruct*>, TimerCmp>;
+
   private:
     void OnTimeout(const DateTime& time);
     void HandleTimer(TimerStruct* timer);
@@ -120,8 +121,8 @@ class TimerQueue : NonCopyable {
     mutable std::mutex mtx{};
     IOWorker* worker{};  // the owner of this TimerQueue
     Channel* timer_channel{};
-    std::map<TimerId, TimerStruct*> timers_map{};
-    std::priority_queue<TimerStruct*, std::vector<TimerStruct*>, TimerCmp> waiting_timers{};
+    std::map<TimerId, TimerStruct*> timers_map GUARDED_BY(mtx);
+    TimerStructQueue waiting_timers GUARDED_BY(mtx);
 
   private:
     inline static std::atomic<TimerId> next_timer_id{};

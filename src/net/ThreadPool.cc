@@ -61,7 +61,7 @@ void ThreadPool::Stop() {
 }
 
 size_t ThreadPool::GetPendingTasks() const {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     return pending_tasks.size();
 }
 
@@ -70,7 +70,7 @@ ThreadPool::TaskId ThreadPool::SubmitTask(ThreadPool::Task&& task) {
 }
 
 ThreadPool::TaskId ThreadPool::SubmitTask(TaskPriority priority, ThreadPool::Task&& task) {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
 
     if (pending_size > 0 && pending_tasks.size() >= pending_size) {
         return -1;
@@ -93,7 +93,7 @@ bool ThreadPool::CancelTask(ThreadPool::TaskId tid) {
         return false;  // tid is invalid
     }
 
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     auto target = tasks_map.find(tid);
     if (target == std::end(tasks_map)) {
         return false;  // this task has finished

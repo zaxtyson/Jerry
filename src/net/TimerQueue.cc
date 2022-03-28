@@ -35,7 +35,7 @@ TimerQueue::~TimerQueue() {
 }
 
 int64_t TimerQueue::GetNextTimeout() const {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     if (waiting_timers.empty()) {
         return -1;  // no timers
     }
@@ -49,7 +49,7 @@ std::vector<TimerQueue::TimerStruct*> TimerQueue::PopExpiredTimers() {
         return expired_timers;
     }
 
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     auto now = DateTime::Now();
     for (size_t i = 0; i < waiting_timers.size(); i++) {
         auto* timer = waiting_timers.top();
@@ -104,7 +104,7 @@ void TimerQueue::HandleTimer(TimerQueue::TimerStruct* timer) {
     // task stop_loop
     if (timer->stop_condition && timer->stop_condition()) {
         LOG_DEBUG("Timer tid = %ld meets the stopping condition, remove it", timer->tid)
-        std::lock_guard<std::mutex> lock(mtx);
+        LockGuard lock(mtx);
         timers_map.erase(timer->tid);
         delete timer;
         return;
@@ -134,7 +134,7 @@ TimerQueue::TimerId TimerQueue::AddTimer(TimerQueue::TimerStruct* timer) {
         return -1;
     }
 
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     // update the wakeup time of timer_fd to the earliest triggered timer
     if (waiting_timers.empty() || timer->expire < waiting_timers.top()->expire) {
         int64_t next_timeout = timer->expire - DateTime::Now();
@@ -165,7 +165,7 @@ TimerQueue::TimerId TimerQueue::AddTimer(const DateTime& when, TimerQueue::Task&
 
 bool TimerQueue::CancelTimer(TimerQueue::TimerId tid) {
     LOG_DEBUG("Timer tid = %ld is marked as canceled", tid)
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     auto target = timers_map.find(tid);
     if (target == std::end(timers_map)) {
         return false;
@@ -175,7 +175,7 @@ bool TimerQueue::CancelTimer(TimerQueue::TimerId tid) {
 }
 
 size_t TimerQueue::GetTimerNums() const {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
     return waiting_timers.size();
 }
 

@@ -48,14 +48,16 @@ void FixedBuffer::Reset() {
 }
 
 AsyncFileAppender::AsyncFileAppender(std::string_view path, int auto_flush_interval)
-    : auto_flush_interval{auto_flush_interval} {
+    : auto_flush_interval{auto_flush_interval},
+      cur_buffer{new FixedBuffer()},
+      next_buffer{new FixedBuffer()} {
     log_file.rdbuf()->pubsetbuf(nullptr, 0);
     log_file.open(path.data(), std::ofstream::out | std::ofstream::app);
     assert(log_file.good());
 }
 
 void AsyncFileAppender::Append(const char* msg, size_t len) {
-    std::lock_guard<std::mutex> lock(mtx);
+    LockGuard lock(mtx);
 
     if (cur_buffer->AvailableBytes() >= len) {
         cur_buffer->Append(msg, len);

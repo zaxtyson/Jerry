@@ -14,7 +14,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -22,6 +21,7 @@
 #include "InetAddress.h"
 #include "utils/DateTime.h"
 #include "utils/NonCopyable.h"
+#include "utils/Mutex.h"
 
 namespace jerry::net {
 
@@ -29,8 +29,6 @@ class Channel;
 class IOWorker;
 class TcpConn;
 class TimerQueue;
-
-using LockGuard = std::lock_guard<std::mutex>;
 
 struct TcpCallback {
     using Type = std::function<void(TcpConn*, const DateTime&)>;
@@ -249,8 +247,8 @@ class TcpConnSet {
     void LockForEach(std::function<void(const TcpConnPtr&)>&& func) const;
 
   private:
-    std::set<TcpConnPtr> conn_set{};
     mutable std::mutex mtx{};
+    std::set<TcpConnPtr> conn_set GUARDED_BY(mtx);
 };
 
 }  // namespace jerry::net
