@@ -190,7 +190,7 @@ ssize_t BaseBuffer::WriteBytesToSsl(SSL* ssl) {
     }
     return n;
 #else
-    return -1
+    return -1;
 #endif
 }
 
